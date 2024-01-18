@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Web Stream Recorder</title>
+</head>
+<body>
+    <label for="urlInput">Entrez l'URL :</label>
+    <input type="text" id="urlInput" placeholder="Entrez l'URL">
+    <button onclick="startRecording()">Commencer l'enregistrement</button>
+
+    <script>
+        function startRecording() {
+          const url = document.getElementById('urlInput').value;
+          window.api.send('startRecording', url);
+        }
+
+        window.api.receive('html-ready', () => {
+            console.log('La fenêtre HTML est prête.');
+        });
+      
+        window.api.receive('recordingStatus', (status) => {
+          console.log('Recording status:', status);
+        });
+    </script>
+</body>
+</html>
