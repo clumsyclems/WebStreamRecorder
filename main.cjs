@@ -1,32 +1,22 @@
-const { app, BrowserWindow, ipcMain, session } = require('electron');
-const axios = require('axios');
-const fs = require('fs');
-const ffmpeg = require('fluent-ffmpeg');
+const { app, BrowserWindow, ipcMain} = require('electron');
 const path = require('path');
 const moment = require('moment');
-const sqlite3 = require('sqlite3');
+const { createRecording, processLinks } = require('./script.cjs');
+const { initializeDatabase, insertInLinksTable, setAllOffline } = require ('./serveur.cjs');
+const cron = require('node-cron');
 
-// Chemin de la base de données SQLite dans le dossier de l'application
-const dbPath = path.join(app.getAppPath(), 'myDatabase.db');
+//Initialise la base de donnée
+initializeDatabase(app);
 
-// Vérifier si la base de données existe déjà
-const dbExists = fs.existsSync(dbPath);
+//À l'init je parcours la base de donnée pour lancé les enregistrements par défauts
+processLinks();
 
-// Créer une connexion à la base de données SQLite
-const db = new sqlite3.Database(dbPath);
+//Créer une tache de fonds pour pouvoir faire la vérification et lancer les enregistrements par défaut de manière régulière (ici toutes les minutes)
+cron.schedule('* */10 * * * *', () => {
+    processLinks();
+  });
 
-// Si la base de données n'existe pas, créer la table
-if (!dbExists) {
-  db.run(`
-      CREATE TABLE IF NOT EXISTS links (
-          Name TEXT PRIMARY KEY,
-          Url TEXT NOT NULL,
-          Online BOOLEAN DEFAULT TRUE,
-          Record BOOLEAN DEFAULT FALSE,
-          Timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
-      )
-  `);
-}
+//L
 
 let mainWindow;
 
@@ -48,8 +38,7 @@ function createWindow() {
 
         // Désactiver le cache pour éviter le rafraîchissement constant
         mainWindow.webContents.session.clearCache(() => {
-            mainWindow.webContents.session.webRequest.onBeforeRequest(filter, (details, callback) => {
-
+            mainWindow.webContents.session.webRequest.onBeforeRequest(filter, callback => {
                 // Continuer la requête normalement
                 callback({});
             });
@@ -60,6 +49,8 @@ function createWindow() {
     });
 
     mainWindow.on('closed', function () {
+        // Appeler setAllOffline lors de la fermeture de la fenêtre
+        setAllOffline();
         mainWindow = null;
     });
 }
@@ -67,7 +58,17 @@ function createWindow() {
 app.on('ready', createWindow);
 
 app.on('window-all-closed', function () {
+    // Appeler setAllOffline lors de la fermeture de toutes les fenêtres
+    setAllOffline();
+
     if (process.platform !== 'darwin') app.quit();
+});
+
+// Gestionnaire d'événement pour le signal de terminaison (Ctrl+C)
+process.on('SIGINT', () => {
+    // Appeler setAllOffline lors de la terminaison de l'application par Ctrl+C
+    setAllOffline();
+    app.quit();
 });
 
 app.on('activate', function () {
@@ -79,9 +80,7 @@ ipcMain.on('startRecording', async (event, url) => {
         console.log('Demande de démarrage d\'enregistrement pour URL :', url);
 
         // Démarrer l'enregistrement pour cette URL avec un titre unique
-
         // Utilisez une expression régulière pour extraire la sous-chaîne
-  
         const matchResult = url.match(/\.com\/(.*?)\//);
 
         // Vérifiez si la correspondance a été trouvée
@@ -89,9 +88,11 @@ ipcMain.on('startRecording', async (event, url) => {
             const sousChaineExtraite = matchResult[1];
             console.log("Sous-chaîne extraite :", sousChaineExtraite);
 
+            insertInLinksTable(sousChaineExtraite,url);
+
             // Utilisez sousChaineExtraite comme nécessaire pour renommer le fichier de sortie
             const outputTitle = `./records/${sousChaineExtraite}_${moment().format("YYYY_MM_DD_HH_mm_ss")}.mp4`;
-            createRecording(url, outputTitle);
+            createRecording(url, outputTitle, sousChaineExtraite);
         } else {
             console.log("Aucune correspondance trouvée.");
         }
@@ -104,41 +105,3 @@ ipcMain.on('startRecording', async (event, url) => {
 ipcMain.on('html-ready', () => {
     console.log('La fenêtre HTML est prête.');
 });
-
-// Fonction pour effectuer l'enregistrement
-async function createRecording(url, outputTitle) {
-    try {
-        console.log('Commencer l\'enregistrement pour URL :', url);
-
-        const response = await axios.get(url.replace(/\\u002D/g, '-'));
-        const correctedResponse = response.data.replace(/\\u002D/g, '-');
-
-        // Ajout de l'affichage des URL avant le filtrage
-        console.log('URLs trouvées avant le filtrage :', correctedResponse.match(/https?:\/\/[^"]*\.m3u8/g));
-
-        const m3u8Urls = correctedResponse.match(/https?:\/\/[^"]*\.m3u8/g);
-
-        if (m3u8Urls && m3u8Urls.length > 0) {
-            const firstM3u8Url = m3u8Urls[0];
-            const outputPath = `./${outputTitle}`;
-
-            await new Promise((resolve, reject) => {
-                ffmpeg(firstM3u8Url)
-                    .output(outputPath)
-                    .on('end', () => {
-                        console.log('Enregistrement terminé avec succès pour :', outputTitle);
-                        resolve();
-                    })
-                    .on('error', (err) => {
-                        console.error('Erreur lors de l\'enregistrement pour :', outputTitle, err);
-                        reject(err);
-                    })
-                    .run();
-            });
-        } else {
-            console.error('Aucune URL .m3u8 trouvée sur la page pour :', outputTitle);
-        }
-    } catch (error) {
-        console.error('Erreur lors de la récupération de la page HTML pour :', outputTitle, error);
-    }
-}
