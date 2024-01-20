@@ -1,22 +1,23 @@
-const { app, BrowserWindow, ipcMain} = require('electron');
+const { app, BrowserWindow, ipcMain } = require('electron');
 const path = require('path');
-const moment = require('moment');
+const dayjs = require('dayjs');
 const { createRecording, processLinks } = require('./script.cjs');
 const { initializeDatabase, insertInLinksTable, setAllOffline } = require ('./serveur.cjs');
 const cron = require('node-cron');
 
-//Initialise la base de donnée
+// Initialise la base de données
 initializeDatabase(app);
 
-//À l'init je parcours la base de donnée pour lancé les enregistrements par défauts
+// Set Offline all the database table link
+setAllOffline();
+
+// À l'initialisation, parcourt la base de données pour lancer les enregistrements par défaut
 processLinks();
 
-//Créer une tache de fonds pour pouvoir faire la vérification et lancer les enregistrements par défaut de manière régulière (ici toutes les minutes)
-cron.schedule('* */10 * * * *', () => {
+// Crée une tâche de fond pour vérifier et lancer les enregistrements par défaut de manière régulière (ici toutes les minutes)
+cron.schedule('*/10 * * * *', () => {
     processLinks();
-  });
-
-//L
+});
 
 let mainWindow;
 
@@ -36,20 +37,20 @@ function createWindow() {
 
         mainWindow.webContents.send('html-ready');
 
-        // Désactiver le cache pour éviter le rafraîchissement constant
+        // Désactive le cache pour éviter le rafraîchissement constant
         mainWindow.webContents.session.clearCache(() => {
             mainWindow.webContents.session.webRequest.onBeforeRequest(filter, callback => {
-                // Continuer la requête normalement
+                // Continue la requête normalement
                 callback({});
             });
 
-            // Charger la page
+            // Charge la page
             mainWindow.webContents.loadURL(pageUrl);
         });
     });
 
     mainWindow.on('closed', function () {
-        // Appeler setAllOffline lors de la fermeture de la fenêtre
+        // Appelle setAllOffline lors de la fermeture de la fenêtre
         setAllOffline();
         mainWindow = null;
     });
@@ -58,7 +59,7 @@ function createWindow() {
 app.on('ready', createWindow);
 
 app.on('window-all-closed', function () {
-    // Appeler setAllOffline lors de la fermeture de toutes les fenêtres
+    // Appelle setAllOffline lors de la fermeture de toutes les fenêtres
     setAllOffline();
 
     if (process.platform !== 'darwin') app.quit();
@@ -66,7 +67,7 @@ app.on('window-all-closed', function () {
 
 // Gestionnaire d'événement pour le signal de terminaison (Ctrl+C)
 process.on('SIGINT', () => {
-    // Appeler setAllOffline lors de la terminaison de l'application par Ctrl+C
+    // Appelle setAllOffline lors de la terminaison de l'application par Ctrl+C
     setAllOffline();
     app.quit();
 });
@@ -80,18 +81,21 @@ ipcMain.on('startRecording', async (event, url) => {
         console.log('Demande de démarrage d\'enregistrement pour URL :', url);
 
         // Démarrer l'enregistrement pour cette URL avec un titre unique
-        // Utilisez une expression régulière pour extraire la sous-chaîne
-        const matchResult = url.match(/\.com\/(.*?)\//);
+        // Utilise une expression régulière pour extraire la sous-chaîne
+        const matchResult = url.match(/\.com\/(.*?)\/?/);
+        const website = url.match(/:\/\/(?:www\.)?(?:[a-zA-Z]+\.)?([a-zA-Z]+)\.com\//);
 
-        // Vérifiez si la correspondance a été trouvée
+
+
+        // Vérifie si la correspondance a été trouvée
         if (matchResult && matchResult.length >= 2) {
             const sousChaineExtraite = matchResult[1];
             console.log("Sous-chaîne extraite :", sousChaineExtraite);
 
-            insertInLinksTable(sousChaineExtraite,url);
+            insertInLinksTable(sousChaineExtraite,url, website);
 
-            // Utilisez sousChaineExtraite comme nécessaire pour renommer le fichier de sortie
-            const outputTitle = `./records/${sousChaineExtraite}_${moment().format("YYYY_MM_DD_HH_mm_ss")}.mp4`;
+            // Utilise sousChaineExtraite comme nécessaire pour renommer le fichier de sortie
+            const outputTitle = `./records/${sousChaineExtraite}_${dayjs().format("YYYY_MM_DD_HH_mm_ss")}.mp4`;
             createRecording(url, outputTitle, sousChaineExtraite);
         } else {
             console.log("Aucune correspondance trouvée.");
