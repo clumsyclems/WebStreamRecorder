@@ -5,12 +5,36 @@ const dayjs = require('dayjs');
 const { getDatabase, updateOnline } = require('./serveur.cjs');
 
 // Fonction pour effectuer l'enregistrement
-async function createRecording(url, outputTitle, name = null) {
+async function createRecording(url, name) {
     try {
         console.log('Commencer l\'enregistrement pour URL :', url);
 
         const response = await axios.get(url.replace(/\\u002D/g, '-'));
-        const correctedResponse = response.data.replace(/\\u002D/g, '-');
+
+        // Pour extraire la sous-chaîne entre \"streamName\":\" et \"
+        const streamNameMatch = response.data.match(/\"streamName\":\"(.*?)\"/);
+        const streamName = streamNameMatch ? streamNameMatch[1] : null;
+
+        // Pour extraire la sous-chaîne entre \"domain\":\" et \"
+        const domainMatch = response.data.match(/\"domain\":\"(.*?)\"/);
+        const domain = domainMatch ? domainMatch[1] : null;
+
+        const correctedResponse = response.data.replace(/\\u002D|\\u002F|{streamName}|{cdnHost}|{suffix}/g, (match) => {
+            switch (match) {
+                case '\\u002D':
+                    return '-';
+                case '\\u002F':
+                    return '/';
+                case '{streamName}':
+                    return streamName;
+                case '{cdnHost}':
+                    return domain;
+                case '{suffix}':
+                    return '_auto';
+                default:
+                    return match;
+            }
+        });
 
         console.log('URLs trouvées avant le filtrage :', correctedResponse.match(/https?:\/\/[^"]*\.m3u8/g));
 
@@ -30,28 +54,29 @@ async function createRecording(url, outputTitle, name = null) {
                         if (name) {
                             updateOnline(name, false);
                         }
-                        console.log('Enregistrement terminé avec succès pour :', outputTitle);
+                        console.log('Enregistrement terminé avec succès pour :', name);
                         resolve();
                     })
                     .on('error', (err) => {
                         if (name) {
                             updateOnline(name, false);
                         }
-                        console.error('Erreur lors de l\'enregistrement pour :', outputTitle, err);
-                        reject(err);
+                        console.error('Erreur lors de l\'enregistrement pour :', name);
+                        //reject(err);
                     })
                     .run();
             });
         } else {
-            console.error('Aucune URL .m3u8 trouvée sur la page pour :', outputTitle);
+            console.error('Aucune URL .m3u8 trouvée sur la page pour :', name);
         }
     } catch (error) {
         if (error.response && error.response.status === 429) {
             console.error('Erreur lors de la récupération de la page: Error 429 Too many requests');
             await new Promise(resolve => setTimeout(resolve, 30000));
-            await createRecording(url, outputTitle, name);
-        } else {
-            console.error('Erreur lors de la récupération de la page HTML pour :', outputTitle, error);
+            await createRecording(url, name);
+        } 
+        else {
+            console.error('Erreur lors de la récupération de la page HTML pour :', name, error);
         }
     }
 }
@@ -72,8 +97,7 @@ async function processLinks() {
             rows.forEach((row) => {
                 const { Name, Url, Online } = row;
                 if (!Online) {
-                    const outputTitle = `./records/${Name}_${dayjs().format("YYYY_MM_DD_HH_mm_ss")}.mp4`;
-                    createRecording(Url, outputTitle, Name);
+                    createRecording(Url, Name);
                 }
             });
         }
