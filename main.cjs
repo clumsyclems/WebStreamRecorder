@@ -4,14 +4,23 @@ const { app, BrowserWindow, ipcMain } = require('electron');
 const path = require('path');
 const { createRecording, processLinks } = require('./script.cjs');
 const { initializeDatabase, insertOrUpdateInLinksTable, setAllOffline } = require('./serveur.cjs');
+const cron = require('node-cron');
 
 let mainWindow = null;
 
+// Initialise la base de données
 initializeDatabase(app);
 
+// Set Offline all the database table link
 setAllOffline();
 
+// À l'initialisation, parcourt la base de données pour lancer les enregistrements par défaut
 processLinks();
+
+// Crée une tâche de fond pour vérifier et lancer les enregistrements par défaut de manière régulière (ici toutes les minutes)
+cron.schedule('*/10 * * * *', () => {
+  processLinks();
+});
 
 function createWindow() {
   mainWindow = new BrowserWindow({
