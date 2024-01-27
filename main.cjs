@@ -61,12 +61,12 @@ ipcMain.on('startRecording', async (event, url) => {
     console.log('Demande de démarrage d\'enregistrement pour URL :', url);
 
     const matchResult = url.match(/\.com\/(.*?)\/?$/);
-    const website = url.match(/:\/\/(?:www\.)?(?:[a-zA-Z]+\.)?([a-zA-Z]+)\.com\//);
+    const website = url.match(/:\/\/(?:www\.)?(?:[a-zA-Z]+\.)?([a-zA-Z0-9_-]+)\.com\//);
 
     if (matchResult && matchResult.length >= 2) {
       const sousChaineExtraite = matchResult[1];
       insertOrUpdateInLinksTable(sousChaineExtraite, url, website[1]);
-      createRecording(url, sousChaineExtraite);
+      createRecording(url, sousChaineExtraite, website[1]);
     } else {
       console.log("Aucune correspondance trouvée.");
     }
