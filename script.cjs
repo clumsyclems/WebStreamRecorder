@@ -45,11 +45,12 @@ async function createRecording(url, name) {
             if (name) {
                 updateOnline(name, true);
             }
-            const outputPath = `./records/${name}_${dayjs().format("YYYY_MM_DD_HH_mm_ss")}.mp4`;
+            const outputPath = `./records/${name}_${dayjs().format("YYYY_MM_DD_HH_mm_ss")}.mkv`;
 
             await new Promise((resolve, reject) => {
                 ffmpeg(firstM3u8Url)
                     .output(outputPath)
+                    .outputOptions('-c copy') // Allow to avoid the re-encoding video
                     .on('end', () => {
                         if (name) {
                             updateOnline(name, false);

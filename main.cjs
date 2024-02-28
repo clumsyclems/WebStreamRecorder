@@ -18,9 +18,7 @@ setAllOffline();
 processLinks();
 
 // Crée une tâche de fond pour vérifier et lancer les enregistrements par défaut de manière régulière (ici toutes les minutes)
-cron.schedule('*/10 * * * *', () => {
-  processLinks();
-});
+cron.schedule('*/10 * * * *', processLinks);
 
 function createWindow() {
   mainWindow = new BrowserWindow({
