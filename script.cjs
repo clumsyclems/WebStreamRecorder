@@ -48,12 +48,12 @@ async function createRecording(url, name, website) {
             case 'cam4':
                 //if(name === 'lucie_mehott')
                 // Utiliser la file d'attente uniquement pour Cam4
-                await cam4Queue.add(() => cam4Url(name, url, (m3u8Url) => {
+                /*await cam4Queue.add(() => cam4Url(name, url, (m3u8Url) => {
                     if (m3u8Url) {
                         console.log("Cam4 flux request");
                         ffmpegRecordRequest(m3u8Url, name);
                     }
-                }));
+                }));*/
                 break;   
             default:
                 break;
@@ -63,7 +63,7 @@ async function createRecording(url, name, website) {
         if (error.code === 'ECONNRESET' || error.code === 'ECONNABORTED') {
             console.error('Erreur lors de la récupération de la page: ECONNRESET ou ECONNABORTED pour ', name);
         }
-        if (error.response && error.response.status === 429) {
+        else if (error.response && error.response.status === 429) {
             console.error('Erreur lors de la récupération de la page: Error 429 Too many requests');
             await new Promise(resolve => setTimeout(resolve, 30000));
             await createRecording(url, name, website);
@@ -85,7 +85,7 @@ async function createRecording(url, name, website) {
 async function ffmpegRecordRequest(m3u8Url, name )
 {
     try {
-        const outputPath = `./records/${name}_${dayjs().format("YYYY_MM_DD_HH_mm_ss")}.mp4`;
+        const outputPath = `./records/${name}_${dayjs().format("YYYY_MM_DD_HH_mm_ss")}.mkv`;
 
         if(m3u8Url == null || m3u8Url === '' || m3u8Url.includes("/_auto"))
         {
@@ -99,6 +99,7 @@ async function ffmpegRecordRequest(m3u8Url, name )
         await new Promise((resolve, reject) => {
             ffmpeg(m3u8Url)
                 .output(outputPath)
+                .outputOptions('-c copy')
                 .on('end', () => {
                     if (name) {
                         updateOnline(name, false);
