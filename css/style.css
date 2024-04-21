@@ -160,8 +160,8 @@ body section#recordingArray table tbody tr td input.switch {
   appearance: none;
   position: relative;
   display: inline-block;
-  width: 30%;
-  height: 50%;
+  min-width: 70px;
+  height: 30px;
   border-radius: 25px;
   background-color: #98ABEE;
   transition: background 0.5s;
@@ -175,8 +175,8 @@ body section#recordingArray table tbody tr td input.switch::after {
   left: 15px;
   transform: translate(-50%, -50%);
   border-radius: 50%;
-  height: 1.25rem;
-  width: 1.25rem;
+  height: 23px;
+  width: 23px;
   background-color: #38419D;
   transition: left 0.5s;
 }
@@ -186,7 +186,7 @@ body section#recordingArray table tbody tr td input.switch:checked {
 body section#recordingArray table tbody tr td input.switch:checked::after {
   background-color: #98ABEE;
   left: unset;
-  right: -5px;
+  right: -8px;
 }
 body section button {
   border: none;
@@ -203,6 +203,7 @@ body section button:hover {
   color: #F9E8C9;
 }
 body section button.recordingButton, body section button.delete, body section button.stop {
+  width: 100px;
   margin: 5px;
   border-radius: 4px;
 }

@@ -2,7 +2,8 @@
 const axios = require('axios');
 const ffmpeg = require('fluent-ffmpeg');
 const dayjs = require('dayjs');
-const { getDatabase, updateOnline, getWebsite } = require('./serveur.cjs');
+const { getDatabase, updateOnline, getWebsite, insertOrUpdateInLinksTable, getInfosFromTable} = require('./serveur.cjs');
+const { Website, RecordingStatus } = require('../common/common.js');
 const puppeteer = require('puppeteer');
 const processes = new Map();
   
@@ -12,39 +13,24 @@ let page;
 // Fonction pour effectuer l'enregistrement
 async function createRecording(url, name, website) {
     try {
-        console.log('Commencer l\'enregistrement pour URL :', url);
-
+        let m3u8Url = null;
         const response = await axios.get(url.replace(/\\u002D/g, '-'));
 
         const correctedResponse = response.data.replace(/\\u002D/g, '-');
 
-        const streamNameMatch = correctedResponse.match(/room_status(.*?)num_viewer/);
-        const streamName = streamNameMatch ? streamNameMatch[1] : null;
-
-        console.log(streamName);
-
         switch (website) {
             case 'stripchat':
-                striptchatUrl(name, correctedResponse, (m3u8Url) => {
-                    if(m3u8Url)
-                    {
-                        ffmpegRecordRequest(m3u8Url, name);
-                    }
-                    else{
-                        console.log('None m3u8 url found');
-                    }
-                });
+                m3u8Url = striptchatUrl(name, correctedResponse);
+                if(m3u8Url != null) {
+                    ffmpegRecordRequest(m3u8Url, name)
+                }
                 break;
             case 'chaturbate':
-                chaturbateUrl(name, correctedResponse, (m3u8Url) => {
-                    if(m3u8Url)
-                    {
-                        ffmpegRecordRequest(m3u8Url, name);
-                    }
-                    else{
-                        console.log('None m3u8 url found');
-                    }
-                });
+                m3u8Url = chaturbateUrl(name, correctedResponse);
+                if(m3u8Url != null)
+                {
+                    ffmpegRecordRequest(m3u8Url, name);
+                }
                 break;
             case 'cam4':
                 //if(name === 'lucie_mehott')
@@ -99,22 +85,30 @@ async function ffmpegRecordRequest(m3u8Url, name )
 
         if (name) {
             updateOnline(name, true);
+
         }
-        
+        /*
         processes.set(name , ffmpeg(m3u8Url).output(outputPath)
+                                            .native()
                                             .outputOptions('-c copy')
+                                            .on('exit', () => {
+                                                updateOnline(name, false);
+                                                console.log('Video recorder exited for: ', name)
+                                            })
+                                            .on('close',  () => {
+                                                updateOnline(name, false);
+                                                console.log('Video recorder closed for: ', name)
+                                            })
                                             .on('end', () => {
-                                                if (name) {
-                                                    updateOnline(name, false);
-                                                }
-                                                console.log('Enregistrement terminé avec succès pour :', name);
+                                                updateOnline(name, false);
+                                                console.log('Video recorder ended for: ', name);
                                             })
                                             .on('error', () => {
-                                                if (name) {
-                                                    updateOnline(name, false);
-                                                }
-                                                console.error('Erreur lors de l\'enregistrement pour :', name);
+                                                updateOnline(name, false);
+                                                console.error('Video recorder error for: ', name);
                                             }));
+        processes.get(name).run();
+        */
     }
     catch (error) {
         if (error.response && error.response.status === 403)
@@ -141,7 +135,7 @@ async function ffmpegRecordRequest(m3u8Url, name )
 }
 
 // Fonction pour parcourir les éléments de la table links et appeler createRecording
-async function processLinks() {
+function processLinks() {
     const db = getDatabase();
 
     if (!db) {
@@ -154,15 +148,15 @@ async function processLinks() {
             console.error('Erreur lors de la récupération des éléments de la table links:', err);
         } else {
             rows.forEach((row) => {
-                const { Name, Url, Online, Website } = row;
-                if (!Online) {
+                const { Name, Url, Record, Website } = row;
+                if (Record) {
                     createRecording(Url, Name, Website);
                 }
             });
         }
     });
 
-    console.log("Tout les lignes on été traitées");
+    //console.log("Tout les lignes on été traitées");
 }
 
 async function cam4Url(name, url, callback) {
@@ -186,7 +180,7 @@ async function cam4Url(name, url, callback) {
                 if(!m3u8Url)
                 {
                     m3u8Url = request.url();
-                    callback(m3u8Url);
+                    callback(m3u8Url, name);
                     browser.close();
                 }
                 // Ne fermez pas la page immédiatement
@@ -226,7 +220,7 @@ async function cam4Url(name, url, callback) {
     }
 }
 
-async function striptchatUrl(name, data, callback)
+function striptchatUrl(name, data)
 {
     // Pour extraire la sous-chaîne entre \"streamName\":\" et \"
     const streamNameMatch = data.match(/\"streamName\":\"(.*?)\"/);
@@ -238,7 +232,7 @@ async function striptchatUrl(name, data, callback)
 
     if(domain === '' || streamName === '' || domain == null || streamName == null)
     {
-        callback(null);
+        return null;
     }
 
     const correctedResponse = data.replace(/\\u002D|\\u002F|{streamName}|{cdnHost}|{suffix}/g, (match) => {
@@ -261,22 +255,41 @@ async function striptchatUrl(name, data, callback)
     const m3u8Urls = correctedResponse.match(/https?:\/\/[^"]*\.m3u8/g);
 
     if (m3u8Urls && m3u8Urls.length >= 1) {
-        callback(m3u8Urls[0]);
+        return m3u8Urls[0];
     } else {
         console.error('Aucune URL m3u8 trouvée pour : ', name);
+        return null;
     }
 
 }
 
-async function chaturbateUrl(name, data, callback)
+function chaturbateUrl(name, data)
 {
-    const correctedResponse = data.replace(/\\u002D/g, "-");
+    const correctedResponse = data.replace(/\\u002D|\\u0022/g, (match) => {
+        switch (match) {
+            case '\\u002D':
+                return '-';
+            case '\\u0022':
+                return '"';
+            default:
+                return match;
+        }
+    });
+
+    /** 
+     * @todo using the following comment code to get the chaturbate model status : private, public, offline
+     */
+    /*
+    const streamNameMatch = correctedResponse.match(/room_status\": \"(.*?)\", \"num_viewer/);
+    const streamName = streamNameMatch ? streamNameMatch[1] : null;
+    */
+
     const m3u8Urls = correctedResponse.match(/https?:\/\/[^"]*\.m3u8/g);
 
     if (m3u8Urls && m3u8Urls.length >= 1) {
-        callback(m3u8Urls[0]);
+        return m3u8Urls[0];
     } else {
-        console.error('Aucune URL m3u8 trouvée pour : ', name);
+        return null;
     }
 }
 
@@ -302,6 +315,74 @@ function killAllProcesses()
         console.log("Type of process :" + typeof process );
     })
 }
+
+function addNewModelfromUrl(modelUrl)
+{
+    const matchResult = modelUrl.match(/\.com\/(.*?)\/?$/);
+    const website = modelUrl.match(/:\/\/(?:www\.)?(?:[a-zA-Z]+\.)?([a-zA-Z0-9_-]+)\.com\//);
+
+    if (matchResult && matchResult.length >= 2) {
+      const sousChaineExtraite = matchResult[1];
+      return insertOrUpdateInLinksTable(sousChaineExtraite, modelUrl, website[1]);
+    }
+}
+
+function updateStatus()
+{
+    const nameAndUrl = getInfosFromTable("links", ["Name", "Url", "Website"]);
+    nameAndUrl.forEach((row) => {
+        const data = findPageInfo(row.Url);
+        switch (row.Website)
+        {
+            case Website.chaturbate:
+            {
+                const correctedResponse = data.replace(/\\u002D|\\u0022/g, (match) => {
+                    switch (match) {
+                        case '\\u002D':
+                            return '-';
+                        case '\\u0022':
+                            return '"';
+                        default:
+                            return match;
+                    }
+                });
+
+                const streamNameMatch = correctedResponse.match(/room_status\": \"(.*?)\", \"num_viewer/);
+                const streamName = streamNameMatch ? streamNameMatch[1] : null;
+                switch (streamName) {
+                    case RecordingStatus.offline:
+                    case RecordingStatus.private:
+                    {
+                        updateOnline(row.Name, false);
+                    }
+                    case RecordingStatus.public:
+                    {
+                        updateOnline(row.Name, true);
+                    }
+                    default:
+                    {
+                        break;
+                    }
+                }
+                break;
+            }
+            default:
+            {
+                break;
+            }
+        }
+    });
+}
+
+async function findPageInfo(url)
+{
+    const response = await axios.get(url.replace(/\\u002D/g, '-'));
+
+    const correctedResponse = response.data.replace(/\\u002D/g, '-');
+
+    return correctedResponse;
+
+}
   
 // Exportez les fonctions pour qu'elles puissent être utilisées dans d'autres fichiers
 module.exports = {
@@ -309,4 +390,5 @@ module.exports = {
     processLinks,
     killAProcess,
     killAllProcesses,
+    addNewModelfromUrl,
 };

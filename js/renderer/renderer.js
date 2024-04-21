@@ -94,9 +94,24 @@ function insertNewRow(row) {
 
 }
 
+function addNewModelEvent()
+{
+    document.getElementById('urlButton').addEventListener('click', (e) => {
+
+        const input = e.target.previousElementSibling;
+        window.versions.addNewModel(input.value).then((resolve) => {
+            if(resolve)
+            {
+                console.log(resolve);
+            }
+        });
+    })
+}
+
 //Apply all functions needed to create the window
 func();
 fillRecordingArray().then(() => {
+    addNewModelEvent();
     addInputChangeStyleEvent();
     updateCheckboxStatus();
 });

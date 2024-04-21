@@ -8,5 +8,6 @@ contextBridge.exposeInMainWorld('versions', {
   fillRecordingArray: () => ipcRenderer.invoke('fillRecordingArray'),
   changeRecordingStatus: (name, status) => ipcRenderer.invoke('changeRecordingStatus', {name, status}),
   removeARowFromName: (name) => ipcRenderer.invoke('removeARowFromName', name),
+  addNewModel: (model) => ipcRenderer.invoke('addNewModel',model),
   // we can also expose variables, not just functions
 })

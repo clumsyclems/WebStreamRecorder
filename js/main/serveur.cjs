@@ -9,17 +9,17 @@ function initializeDatabase(app) {
   const dbPath = path.join(__dirname, '../../database/myDatabase.db');
   db = new sqlite3.Database(dbPath);
 
-  db.run(`
-    CREATE TABLE IF NOT EXISTS links (
-      Name TEXT PRIMARY KEY,
-      Url TEXT NOT NULL,
-      Online BOOLEAN DEFAULT FALSE,
-      Record BOOLEAN DEFAULT FALSE,
-      Website TEXT NOT NULL,
-      Timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
-    )
-  `);
-
+  db.run(`CREATE TABLE IF NOT EXISTS links (
+    Name TEXT,
+    Url TEXT,
+    Online BOOLEAN DEFAULT FALSE,
+    Record BOOLEAN DEFAULT FALSE,
+    Website TEXT NOT NULL,
+    Timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (Name, Url)
+    )`
+  );
+  
   return db; // Retourner la connexion à la base de données pour pouvoir l'utiliser dans ce fichier
 }
 
@@ -48,8 +48,7 @@ async function insertOrUpdateInLinksTable(name, url, website, online = false, re
   const query = `
     INSERT INTO links (Name, Url, Online, Record, Website)
     VALUES (?, ?, ?, ?, ?)
-    ON CONFLICT(Name) DO UPDATE SET
-      Url = excluded.Url,
+    ON CONFLICT(Name, Url) DO UPDATE SET
       Online = excluded.Online,
       Record = excluded.Record,
       Website = excluded.Website
@@ -111,8 +110,6 @@ async function removeLinkFromName(name){
 //fonction pour récupérer tout la table links
 function getAllLinks() { 
   return new Promise((resolve, reject) => {
-    const dbPath = path.join(__dirname, '../../database/myDatabase.db');
-    db = new sqlite3.Database(dbPath);
     // Récupérer plusieurs éléments de la table
     db.all('SELECT * FROM links ORDER BY Name', (err, rows) => {
       if (err) {
@@ -121,6 +118,20 @@ function getAllLinks() {
       }
 
       resolve(rows); // Résoudre la promesse avec les éléments récupérés
+    });
+  });
+}
+
+function getInfosFromTable(table, params = []){
+  const query = `SELECT  ${params.join(', ')} FROM ${table}`;
+  return new Promise((resolve, reject) => {
+    db.all(query, (err, rows) => {
+      if(err) {
+        reject(err);
+        return;
+      }
+
+      resolve(rows);
     });
   });
 }
@@ -138,4 +149,5 @@ module.exports = {
   removeLinkFromName,
   getAllLinks,
   getDatabase: () => db,
+  getInfosFromTable,
 };

@@ -200,8 +200,8 @@ body {
                             appearance: none;
                             position: relative;
                             display: inline-block;
-                            width: 30%;
-                            height: 50%;
+                            min-width: 70px;
+                            height: 30px;
                             border-radius: 25px;
                             background-color: $light-blue;
                             transition: background 0.5s;
@@ -215,8 +215,8 @@ body {
                                 left: 15px;
                                 transform: translate(-50%, -50%);
                                 border-radius: 50%;
-                                height: 1.25rem;
-                                width: 1.25rem;
+                                height: 23px;
+                                width: 23px;
                                 background-color: $navy;
                                 transition: left 0.5s;
                             }
@@ -228,7 +228,7 @@ body {
                             &:checked::after {
                                 background-color: $light-blue;
                                 left: unset;
-                                right: -5px;   
+                                right: -8px;   
                             }
                         }
                     }
@@ -255,6 +255,7 @@ body {
         &.recordingButton,
         &.delete,
         &.stop {
+            width: 100px;
             margin: 5px;
             border-radius: 4px;
         }
