@@ -1,0 +1,210 @@
+body {
+  background-color: #98ABEE;
+}
+body section {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  min-width: 100%;
+  max-height: 500px;
+  overflow-y: auto;
+}
+body section div {
+  display: flex;
+}
+body section div.container {
+  flex-direction: column;
+  justify-content: center;
+  margin: 50px auto;
+  padding: 0px 1% 15px;
+  min-width: 88%;
+  border-radius: 5px;
+  background-color: #F9E8C9;
+  border: 2px solid #1D24CA;
+}
+body section div.container label {
+  margin-top: 5px;
+  width: 50%;
+  text-align: left;
+  color: #535C91;
+  border-radius: 5px;
+  padding: 5px;
+}
+body section div.inputContainer {
+  flex-direction: row;
+  align-items: center;
+  min-width: 100%;
+}
+body section div.inputContainer input {
+  min-width: 70%;
+  height: 34px;
+  border: 2px solid #535C91;
+  border-radius: 5px 0px 0px 5px;
+}
+body section div.inputContainer input:focus {
+  outline: none;
+  border-color: #1D24CA;
+}
+body section div.inputContainer button {
+  min-width: 20%;
+  height: 40px;
+  border-radius: 0px 5px 5px 0px;
+}
+body section table {
+  min-width: 90%;
+}
+body section#currentRecordings table {
+  border-collapse: separate;
+  border-spacing: 0;
+  border-radius: 10px;
+  overflow: hidden;
+}
+body section#currentRecordings table caption {
+  text-align: left;
+  padding: 10px 25px 10px;
+  margin: 5px 1px;
+  border-radius: 5px;
+  background-color: #1D24CA;
+  font-weight: bold;
+  color: #F9E8C9;
+}
+body section#currentRecordings table th,
+body section#currentRecordings table td {
+  padding: 10px 0px 15px;
+  min-width: 25%;
+  text-align: center;
+}
+body section#currentRecordings table th {
+  background-color: #1D24CA;
+  color: #F9E8C9;
+}
+body section#currentRecordings table th:first-child {
+  border-top-left-radius: 10px;
+}
+body section#currentRecordings table th:last-child {
+  border-top-right-radius: 10px;
+}
+body section#currentRecordings table td {
+  align-items: center;
+  background-color: #F9E8C9;
+  color: #1D24CA;
+  border-top: 2px solid #38419D;
+}
+body section#currentRecordings table td.actions * {
+  min-width: 40%;
+  margin-right: 4%;
+  margin-left: 4%;
+}
+body section#recordingArray table {
+  display: flex;
+  flex-direction: column;
+  border-radius: 10px;
+}
+body section#recordingArray table caption {
+  text-align: left;
+  padding: 10px 7px 10px;
+  margin: 1px;
+  border-radius: 5px;
+  background-color: #1D24CA;
+  font-weight: bold;
+  color: #F9E8C9;
+  min-width: 100%;
+}
+body section#recordingArray table tbody {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  flex-wrap: wrap;
+  justify-content: center;
+  min-width: 100%;
+}
+body section#recordingArray table tbody tr {
+  display: flex;
+  flex-direction: row;
+  width: 100%;
+  align-items: center;
+}
+body section#recordingArray table tbody tr.recording td {
+  background-color: #52D3D8;
+}
+body section#recordingArray table tbody tr th,
+body section#recordingArray table tbody tr td {
+  padding: 10px 0px;
+  min-width: 25%;
+  border: 2px solid #98ABEE;
+  border-radius: 10px;
+}
+body section#recordingArray table tbody tr th {
+  background-color: #1D24CA;
+  color: #F9E8C9;
+}
+body section#recordingArray table tbody tr td {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: #F9E8C9;
+  color: #1D24CA;
+  height: 60px;
+  text-align: center;
+}
+body section#recordingArray table tbody tr td.recordingButtons * {
+  min-width: 40%;
+  margin-right: 4%;
+  margin-left: 4%;
+}
+body section#recordingArray table tbody tr td.url {
+  font-size: 14px;
+  overflow-y: hidden;
+}
+body section#recordingArray table tbody tr td input.switch {
+  appearance: none;
+  position: relative;
+  display: inline-block;
+  width: 30%;
+  height: 50%;
+  border-radius: 25px;
+  background-color: #98ABEE;
+  transition: background 0.5s;
+  outline: none;
+  cursor: pointer;
+}
+body section#recordingArray table tbody tr td input.switch::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 15px;
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+  height: 1.25rem;
+  width: 1.25rem;
+  background-color: #38419D;
+  transition: left 0.5s;
+}
+body section#recordingArray table tbody tr td input.switch:checked {
+  background-color: #38419D;
+}
+body section#recordingArray table tbody tr td input.switch:checked::after {
+  background-color: #98ABEE;
+  left: unset;
+  right: -5px;
+}
+body section button {
+  border: none;
+  background-color: #535C91;
+  color: #F9E8C9;
+  text-align: center;
+  transition: all 0.5s;
+  cursor: pointer;
+  padding: 10px;
+  font-size: 12px;
+}
+body section button:hover {
+  background-color: #1D24CA;
+  color: #F9E8C9;
+}
+body section button.recordingButton, body section button.delete, body section button.stop {
+  margin: 5px;
+  border-radius: 4px;
+}
+
+/*# sourceMappingURL=style.css.map */

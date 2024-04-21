@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html>
+
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; script-src 'self'"
+    />
+    <meta
+      http-equiv="X-Content-Security-Policy"
+      content="default-src 'self'; script-src 'self'"
+    />
+    <title>WebStreamRecorder</title>
+    <link rel="stylesheet" href="../css/style.css">
+  </head>
+
+  <body>
+    <section id="currentRecordings">
+
+      <table>
+
+        <caption> Currrent Recording : </caption>
+        <tbody>
+
+          <tr class="tableHead">
+            <th>Model</th>
+            <th>StartTime</th>
+            <th>Duration</th>
+            <th>Actions</th>
+          </tr>
+  
+          <tr class="recording">
+            <td class="name">chaturbabe__</td>
+            <td class="startTime">11 : 01 : 00</td>
+            <td class="duration">01 : 00 : 00</td>
+            <td class="actions">
+  
+              <button class="stop">Stop</button>
+  
+            </td>
+          </tr>
+          
+          <tr class="recording">
+            <td class="name">bunnyblondy</td>
+            <td class="startTime">10 : 01 : 00</td>
+            <td class="duration">02 : 00 : 00</td>
+            <td class="actions">
+  
+              <button class="stop">Stop</button>
+  
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+  
+    <section id="pageHeader">
+     
+      <div class="container">
+        
+        <label id="urlLabel" for="urlInput">Ajouter un modèle : </label>
+        
+        <div class="inputContainer">
+          <input  id="urlInput" type="text" placeholder="Entrez l'URL"/>
+          <button id="urlButton" > Commencer l'enregistrement </button>
+        </div>
+  
+      </div>
+    
+    </section> 
+    
+    <section id="recordingArray">
+      
+      <table>
+        <caption> Recording Info : </caption>
+        <tbody>
+          <tr>
+            <th>Model</th>
+            <th>URL</th>
+            <th>Auto Recording</th>
+            <th>Actions</th>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+  </body>
+  <script src="../js/renderer/renderer.js"></script>
+</html>
