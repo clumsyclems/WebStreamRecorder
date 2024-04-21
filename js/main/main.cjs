@@ -14,6 +14,7 @@ const { getAllLinks,
         insertOrUpdateInLinksTable,
         setAllOffline, 
         removeLinkFromName,
+        updateRecord,
       } 
       = require('./serveur.cjs');
 const cron = require('node-cron');
@@ -37,8 +38,12 @@ app.whenReady().then(() => {
       const links = getAllLinks();
       return links;
     })
-    ipcMain.handle('changeRecordingStatus', (name, status) => {
-      
+    ipcMain.handle('changeRecordingStatus', (event, args) => {
+      const {name, status} = args;
+      return updateRecord(name, status);
+    });
+    ipcMain.handle('removeARowFromName', (event, name) => {
+      return removeLinkFromName(name);
     });
     createWindow()
   

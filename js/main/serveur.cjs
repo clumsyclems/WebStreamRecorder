@@ -24,24 +24,27 @@ function initializeDatabase(app) {
 }
 
 // Fonction générique pour exécuter une requête SQL avec des paramètres
-function runQuery(query, params = [], callback = () => {}) {
-  if (!db) {
-    console.error('Erreur: La base de données n\'est pas initialisée.');
-    return;
-  }
-
-  db.run(query, params, (err) => {
-    if (err) {
-      console.error('Erreur lors de l\'exécution de la requête:', err);
-    } else {
-      callback();
+async function runQuery(query, params = []) {
+  return new Promise((resolve, reject) => {
+    if (!db) {
+      reject(new Error('Erreur: La base de données n\'est pas initialisée.'));
+      console.error("The Database is not initialized");
+      return;
     }
-  });
 
+    db.run(query, params, function(err) {
+      if (err) {
+        reject(new Error('Erreur lors de l\'exécution de la requête:', err));
+      } else {
+        resolve({ message: 'Requête exécutée avec succès' });
+      }
+    });
+  });
 }
 
+
 // Fonction pour insérer ou mettre à jour des valeurs dans la table links
-function insertOrUpdateInLinksTable(name, url, website, online = false, record = false) {
+async function insertOrUpdateInLinksTable(name, url, website, online = false, record = false) {
   const query = `
     INSERT INTO links (Name, Url, Online, Record, Website)
     VALUES (?, ?, ?, ?, ?)
@@ -52,14 +55,24 @@ function insertOrUpdateInLinksTable(name, url, website, online = false, record =
       Website = excluded.Website
   `;
 
-  runQuery(query, [name, url, online, record, website]);
+  try {
+    const success = await runQuery(query, [name, url, online, record, website]);
+    return success;
+  } catch (error) {
+    return false;
+  }
 }
 
 // Fonction générique pour mettre à jour une colonne d'un élément dans la table links
-function updateColumn(name, columnName, columnValue) {
+async function updateColumn(name, columnName, columnValue) {
   const query = `UPDATE links SET ${columnName} = ? WHERE Name = ?`;
 
-  runQuery(query, [columnValue, name]);
+  try {
+    const success = await runQuery(query, [columnValue, name]);
+    return success;
+  } catch (error) {
+    return false;
+  }
 }
 
 // Fonction pour récupérer la valeur "Website" d'un élément dans la table links
@@ -74,24 +87,34 @@ function getWebsite(name, callback) {
 }
 
 // Fonction pour mettre à 'false' la valeur "Online" de tous les éléments dans la table links
-function setAllOffline() {
+async function setAllOffline() {
   const query = 'UPDATE links SET Online = ?';
-  runQuery(query, [false]);
+  try {
+    const success = await runQuery(query, [false]);
+    return success;
+  } catch (error) {
+    return false;
+  }
 }
 
 // Fonction pour supprimer une ligne de la table links
-function removeLinkFromName(name){
+async function removeLinkFromName(name){
   const query = 'DELETE FROM links WHERE Name = ?';
-  runQuery(query, [name]);
+  try {
+    const success = await runQuery(query, [name]);
+    return success;
+  } catch (error) {
+    return false;
+  }
 }
 
 //fonction pour récupérer tout la table links
 function getAllLinks() { 
   return new Promise((resolve, reject) => {
     const dbPath = path.join(__dirname, '../../database/myDatabase.db');
-    database = new sqlite3.Database(dbPath);
+    db = new sqlite3.Database(dbPath);
     // Récupérer plusieurs éléments de la table
-    database.all('SELECT * FROM links ORDER BY Name', (err, rows) => {
+    db.all('SELECT * FROM links ORDER BY Name', (err, rows) => {
       if (err) {
         reject(err); // Rejeter la promesse en cas d'erreur
         return;

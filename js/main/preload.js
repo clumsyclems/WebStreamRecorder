@@ -6,6 +6,7 @@ contextBridge.exposeInMainWorld('versions', {
   electron: () => process.versions.electron,
   ping:() => ipcRenderer.invoke('ping'),
   fillRecordingArray: () => ipcRenderer.invoke('fillRecordingArray'),
-  changeRecordingStatus: (name, status) => ipcRenderer.invoke('changeRecordingStatus',name , status),
+  changeRecordingStatus: (name, status) => ipcRenderer.invoke('changeRecordingStatus', {name, status}),
+  removeARowFromName: (name) => ipcRenderer.invoke('removeARowFromName', name),
   // we can also expose variables, not just functions
 })
