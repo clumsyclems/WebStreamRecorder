@@ -86,6 +86,10 @@ function insertNewRow(row) {
     const newButton = document.createElement('button');
     newButton.innerHTML = 'Delete';
     newButton.classList.add('delete')
+    newButton.addEventListener('click', () =>{
+        window.versions.removeARowFromName(row.Name);
+        newRow.remove();
+    });
     action.appendChild(newButton);
 
 }
