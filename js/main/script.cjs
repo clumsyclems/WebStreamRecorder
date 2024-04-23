@@ -3,7 +3,8 @@ const axios = require('axios');
 const ffmpeg = require('fluent-ffmpeg');
 const dayjs = require('dayjs');
 const { getDatabase, updateOnline, getWebsite, insertOrUpdateInLinksTable, getInfosFromTable} = require('./serveur.cjs');
-const { Website, RecordingStatus } = require('../common/common.js');
+const { Website, RecordingStatus, Action} = require('../common/common.js');
+const { updateModelStatus} = require('./main.cjs');
 const puppeteer = require('puppeteer');
 const processes = new Map();
   
@@ -21,16 +22,9 @@ async function createRecording(url, name, website) {
         switch (website) {
             case 'stripchat':
                 m3u8Url = striptchatUrl(name, correctedResponse);
-                if(m3u8Url != null) {
-                    ffmpegRecordRequest(m3u8Url, name)
-                }
                 break;
             case 'chaturbate':
                 m3u8Url = chaturbateUrl(name, correctedResponse);
-                if(m3u8Url != null)
-                {
-                    ffmpegRecordRequest(m3u8Url, name);
-                }
                 break;
             case 'cam4':
                 //if(name === 'lucie_mehott')
@@ -44,6 +38,10 @@ async function createRecording(url, name, website) {
                 break;   
             default:
                 break;
+        }
+
+        if(m3u8Url != null) {
+            ffmpegRecordRequest(m3u8Url, name)
         }
     }
     catch (error) {
@@ -87,7 +85,6 @@ async function ffmpegRecordRequest(m3u8Url, name )
             updateOnline(name, true);
 
         }
-        /*
         processes.set(name , ffmpeg(m3u8Url).output(outputPath)
                                             .native()
                                             .outputOptions('-c copy')
@@ -107,8 +104,7 @@ async function ffmpegRecordRequest(m3u8Url, name )
                                                 updateOnline(name, false);
                                                 console.error('Video recorder error for: ', name);
                                             }));
-        processes.get(name).run();
-        */
+        //processes.get(name).run();
     }
     catch (error) {
         if (error.response && error.response.status === 403)
@@ -143,14 +139,17 @@ function processLinks() {
         return;
     }
 
-    db.all('SELECT * FROM links', (err, rows) => {
+    db.all('SELECT * FROM links WHERE Online = 1 AND Record = 1', (err, rows) => {
         if (err) {
             console.error('Erreur lors de la récupération des éléments de la table links:', err);
         } else {
             rows.forEach((row) => {
-                const { Name, Url, Record, Website } = row;
-                if (Record) {
+                const { Name, Url, Website} = row;
+                if (processes.get(Name) === undefined) {
                     createRecording(Url, Name, Website);
+                }
+                else{
+                    console.error('La valeur existe déjà')
                 }
             });
         }
@@ -276,19 +275,12 @@ function chaturbateUrl(name, data)
         }
     });
 
-    /** 
-     * @todo using the following comment code to get the chaturbate model status : private, public, offline
-     */
-    /*
-    const streamNameMatch = correctedResponse.match(/room_status\": \"(.*?)\", \"num_viewer/);
-    const streamName = streamNameMatch ? streamNameMatch[1] : null;
-    */
-
     const m3u8Urls = correctedResponse.match(/https?:\/\/[^"]*\.m3u8/g);
 
     if (m3u8Urls && m3u8Urls.length >= 1) {
         return m3u8Urls[0];
     } else {
+        console.error('Aucune URL m3u8 trouvée pour : ', name);
         return null;
     }
 }
@@ -327,51 +319,73 @@ function addNewModelfromUrl(modelUrl)
     }
 }
 
-function updateStatus()
+function updateLinksStatus()
 {
-    const nameAndUrl = getInfosFromTable("links", ["Name", "Url", "Website"]);
-    nameAndUrl.forEach((row) => {
-        const data = findPageInfo(row.Url);
-        switch (row.Website)
-        {
-            case Website.chaturbate:
-            {
-                const correctedResponse = data.replace(/\\u002D|\\u0022/g, (match) => {
-                    switch (match) {
-                        case '\\u002D':
-                            return '-';
-                        case '\\u0022':
-                            return '"';
-                        default:
-                            return match;
-                    }
-                });
-
-                const streamNameMatch = correctedResponse.match(/room_status\": \"(.*?)\", \"num_viewer/);
-                const streamName = streamNameMatch ? streamNameMatch[1] : null;
-                switch (streamName) {
-                    case RecordingStatus.offline:
-                    case RecordingStatus.private:
-                    {
-                        updateOnline(row.Name, false);
-                    }
-                    case RecordingStatus.public:
-                    {
-                        updateOnline(row.Name, true);
-                    }
-                    default:
-                    {
-                        break;
-                    }
-                }
-                break;
-            }
-            default:
-            {
-                break;
-            }
-        }
-    });
+    getInfosFromTable("links", ["Name", "Url", "Website"])
+        .then((request) => {
+            request.forEach((row) => {
+                findPageInfo(row.Url)
+                    .then((data) => {
+                        switch (row.Website)
+                        {
+                            case Website.chaturbate:
+                            {
+                                const correctedResponse = data.replace(/\\u002D|\\u0022/g, (match) => {
+                                    switch (match) {
+                                        case '\\u002D':
+                                            return '-';
+                                        case '\\u0022':
+                                            return '"';
+                                        default:
+                                            return match;
+                                    }
+                                });
+                
+                                const streamNameMatch = correctedResponse.match(/room_status\": \"(.*?)\", \"num_viewer/);
+                                const streamName = streamNameMatch ? streamNameMatch[1] : null;
+                                switch (streamName) {
+                                    case RecordingStatus.public:
+                                    {
+                                        updateOnline(row.Name, true);
+                                        updateModelStatus(row.Name, RecordingStatus.public);
+                                        break;
+                                    }
+                                    case RecordingStatus.offline:
+                                    {
+                                        updateOnline(row.Name, false);
+                                        updateModelStatus(row.Name, RecordingStatus.offline);
+                                        break;
+                                    }
+                                    case RecordingStatus.private:
+                                    {
+                                        updateOnline(row.Name, false);
+                                        updateModelStatus(row.Name, RecordingStatus.private);
+                                        break;
+                                    }
+                                    default:
+                                    {
+                                        updateOnline(row.Name, false);
+                                        break;
+                                    }
+                                }
+                                break;
+                            }
+                            case Website.cam4:
+                            case Website.stripchat:
+                            {
+                                break;
+                            }
+                            default:
+                            {
+                                console.error("Website given does not supported : ", row.website)
+                                break;
+                            }
+                        }
+                    })
+                    .catch(err => console.error(err));
+            });
+        })
+        .catch(err => console.error(err));
 }
 
 async function findPageInfo(url)
@@ -391,4 +405,5 @@ module.exports = {
     killAProcess,
     killAllProcesses,
     addNewModelfromUrl,
+    updateLinksStatus,
 };

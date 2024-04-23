@@ -6,7 +6,8 @@ const { createRecording,
         processLinks, 
         killAProcess, 
         killAllProcesses,
-        addNewModelfromUrl
+        addNewModelfromUrl,
+        updateLinksStatus
       }
        = require('./script.cjs');
 
@@ -15,6 +16,7 @@ const { getAllLinks,
         setAllOffline, 
         removeLinkFromName,
         updateRecord,
+        getInfosFromTableWithUrlConstraint,
       } 
       = require('./serveur.cjs');
 const cron = require('node-cron');
@@ -25,14 +27,6 @@ initializeDatabase(app);
 
 // Set Offline all the database table link
 setAllOffline();
-
-// À l'initialisation, parcourt la base de données pour lancer les enregistrements par défaut
-processLinks();
-
-// Crée une tâche de fond pour vérifier et lancer les enregistrements par défaut de manière régulière (ici toutes les minutes)
-cron.schedule('*/10 * * * *', () => {
-  processLinks();
-});
 
 let window = null;
 
@@ -48,6 +42,20 @@ const createWindow = () => {
     window.loadFile('./html/index.html')
 }
 
+function initApplication()
+{
+  createWindow()
+  // À l'initialisation, parcourt la base de données pour lancer les enregistrements par défaut
+  updateLinksStatus();
+  processLinks();
+
+  // Crée une tâche de fond pour vérifier et lancer les enregistrements par défaut de manière régulière (ici toutes les minutes)
+  cron.schedule('*/1 * * * *', () => {
+    updateLinksStatus();
+    processLinks();
+  });
+}
+
 app.whenReady().then(() => {
     ipcMain.handle('ping', () => 'pong')
     ipcMain.handle('fillRecordingArray', () => {
@@ -61,14 +69,17 @@ app.whenReady().then(() => {
     ipcMain.handle('removeARowFromName', (event, name) => {
       return removeLinkFromName(name);
     });
-    ipcMain.handle('addNewModel', (event, modelUrl) => {
-      return addNewModelfromUrl(modelUrl);
+    ipcMain.handle('addNewModel', async (event, modelUrl) => {
+      addNewModelfromUrl(modelUrl);
+      const model = await getModel(modelUrl);
+      //console.log(model);
+      return model;
     });
 
-    createWindow()
-  
+    initApplication();
+
     app.on('activate', () => {
-      if (BrowserWindow.getAllWindows().length === 0) createWindow()
+      if (BrowserWindow.getAllWindows().length === 0) initApplication()
     })
 })
 
@@ -77,7 +88,21 @@ function updateCurrentRecordingModel(recordingModel, action)
   window.webContents.send('updateCurrentRecordingModel', recordingModel, action);
 }
 
+function updateModelStatus()
+{
+  window.webContents.send('updateCurrentRecordingModel', modelName, recordingStatus);
+}
+
+async function getModel(modelUrl)
+{
+  return getInfosFromTableWithUrlConstraint('links', ['*'], modelUrl);
+}
+
 app.on('window-all-closed', () => {
     if (process.platform !== 'darwin') app.quit()
 })
 
+module.exports = {
+  updateCurrentRecordingModel,
+  updateModelStatus,
+}

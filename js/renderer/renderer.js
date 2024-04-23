@@ -47,9 +47,8 @@ function updateCheckboxStatus(){
 
 async function fillRecordingArray() {
     const ask = await window.versions.fillRecordingArray();
-    console.log(ask[0]);
     ask.forEach(row => {
-        insertNewRow(row);
+        insertNewRow(row, false);
     });
 }
 
@@ -62,6 +61,7 @@ function insertNewRow(row) {
     if(row.Record){newRow.classList.add('recording')};
     
     //Insert the name of each row
+    newRow.id = row.Name ;
     let name = newRow.insertCell(0);
     name.classList.add('name');
     name.innerHTML = row.Name;
@@ -77,7 +77,7 @@ function insertNewRow(row) {
     const newInput = document.createElement('input');
     newInput.classList.add('switch')
     newInput.type = 'checkbox';
-    newInput.checked = row.Online;
+    newInput.checked = row.Record;
     autoRecording.appendChild(newInput);
 
     //Insert the delete button
@@ -91,7 +91,6 @@ function insertNewRow(row) {
         newRow.remove();
     });
     action.appendChild(newButton);
-
 }
 
 function addNewModelEvent()
@@ -100,11 +99,9 @@ function addNewModelEvent()
 
         const input = e.target.previousElementSibling;
         window.versions.addNewModel(input.value).then((resolve) => {
-            if(resolve)
-            {
-                console.log(resolve);
-            }
-        });
+            resolve.forEach(row => insertNewRow(row, true));
+        })
+        .catch((error) => console.error(error));
     })
 }
 

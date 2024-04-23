@@ -136,6 +136,33 @@ function getInfosFromTable(table, params = []){
   });
 }
 
+function getInfosFromTableWithNameConstraint(table, params = [], name){
+  const query = `SELECT  ${params.join(', ')} FROM ${table} WHERE Name = '${name}'`;
+  return new Promise((resolve, reject) => {
+    db.all(query, (err, rows) => {
+      if(err) {
+        reject(err);
+        return;
+      }
+
+      resolve(rows);
+    });
+  });
+}
+
+function getInfosFromTableWithUrlConstraint(table, params = [], url){
+  return new Promise((resolve, reject) => {
+    db.all(`SELECT ${params.join(', ')} FROM ${table} WHERE Url = '${url}'`, (err, rows) => {
+      if(err) {
+        reject(err);
+        return;
+      }
+
+      resolve(rows);
+    });
+  });
+}
+
 // Exporter les fonctions pour qu'elles puissent être utilisées dans d'autres fichiers
 module.exports = {
   initializeDatabase,
@@ -150,4 +177,6 @@ module.exports = {
   getAllLinks,
   getDatabase: () => db,
   getInfosFromTable,
+  getInfosFromTableWithNameConstraint,
+  getInfosFromTableWithUrlConstraint,
 };
