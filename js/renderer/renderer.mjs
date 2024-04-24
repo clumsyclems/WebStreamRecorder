@@ -1,4 +1,6 @@
+import {RecordingStatus} from '../common/common.mjs';
 //Add a eventlistener to all checkboxes to change the line class
+
 function addInputChangeStyleEvent(){
     document.querySelectorAll('input.switch[type="checkbox"]').forEach(item => {
         item.addEventListener('change', (e) => {
@@ -105,6 +107,26 @@ function addNewModelEvent()
     })
 }
 
+window.versions.updateModelStatus((model, status) => {
+    console.log(model, status);
+    /*let sameStatus = document.getElementById(`${model}`).classList.contains(`${status}`);
+    if(!sameStatus)
+    {
+        for(recordingStatus in RecordingStatus)
+        {
+            if(RecordingStatus[recordingStatus] == status)
+            {
+                document.getElementById(`${model}`).classList.add(`${RecordingStatus[recordingStatus]}`);
+            }
+            else
+            {
+                document.getElementById(`${model}`).classList.remove(`${RecordingStatus[recordingStatus]}`);
+            }
+        }
+    }*/
+});
+
+window.versions.ready();
 //Apply all functions needed to create the window
 func();
 fillRecordingArray().then(() => {
@@ -112,4 +134,3 @@ fillRecordingArray().then(() => {
     addInputChangeStyleEvent();
     updateCheckboxStatus();
 });
-

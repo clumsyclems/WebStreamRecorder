@@ -2,7 +2,8 @@
   "name": "webstreamrecorder2",
   "version": "1.0.0",
   "description": "Second Version Of WebStreamRecorder",
-  "main": "./js/main/main.cjs",
+  "type": "module",
+  "main": "./js/main/main.mjs",
   "scripts": {
     "style:build": "sass ./css/style.scss ./css/style.css",
     "start": "npm run style:build && electron .",

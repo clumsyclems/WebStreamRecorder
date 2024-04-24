@@ -1,18 +1,17 @@
-// script.cjs
-const axios = require('axios');
-const ffmpeg = require('fluent-ffmpeg');
-const dayjs = require('dayjs');
-const { getDatabase, updateOnline, getWebsite, insertOrUpdateInLinksTable, getInfosFromTable} = require('./serveur.cjs');
-const { Website, RecordingStatus, Action} = require('../common/common.js');
-const { updateModelStatus} = require('./main.cjs');
-const puppeteer = require('puppeteer');
+// script.js
+import axios from 'axios';
+import ffmpeg from 'fluent-ffmpeg';
+import dayjs from 'dayjs';
+import { getDatabase, insertOrUpdateInLinksTable, getInfosFromTable, updateColumn} from './serveur.mjs';
+import { Website, RecordingStatus, Action} from '../common/common.mjs';
+import puppeteer from 'puppeteer';
 const processes = new Map();
   
 let browser;
 let page;
 
 // Fonction pour effectuer l'enregistrement
-async function createRecording(url, name, website) {
+export async function createRecording(url, name, website) {
     try {
         let m3u8Url = null;
         const response = await axios.get(url.replace(/\\u002D/g, '-'));
@@ -71,7 +70,7 @@ async function createRecording(url, name, website) {
     }
 }
 
-async function ffmpegRecordRequest(m3u8Url, name )
+export async function ffmpegRecordRequest(m3u8Url, name )
 {
     try {
         const outputPath = `./records/${name}_${dayjs().format("YYYY_MM_DD_HH_mm_ss")}.mkv`;
@@ -82,26 +81,26 @@ async function ffmpegRecordRequest(m3u8Url, name )
         }
 
         if (name) {
-            updateOnline(name, true);
+            updateColumn(name, 'Online', true);
 
         }
         processes.set(name , ffmpeg(m3u8Url).output(outputPath)
                                             .native()
                                             .outputOptions('-c copy')
                                             .on('exit', () => {
-                                                updateOnline(name, false);
+                                                updateColumn(name, 'Online',false);
                                                 console.log('Video recorder exited for: ', name)
                                             })
                                             .on('close',  () => {
-                                                updateOnline(name, false);
+                                                updateColumn(name, 'Online', false);
                                                 console.log('Video recorder closed for: ', name)
                                             })
                                             .on('end', () => {
-                                                updateOnline(name, false);
+                                                updateColumn(name, 'Online', false);
                                                 console.log('Video recorder ended for: ', name);
                                             })
                                             .on('error', () => {
-                                                updateOnline(name, false);
+                                                updateColumn(name, 'Online', false);
                                                 console.error('Video recorder error for: ', name);
                                             }));
         //processes.get(name).run();
@@ -131,7 +130,7 @@ async function ffmpegRecordRequest(m3u8Url, name )
 }
 
 // Fonction pour parcourir les éléments de la table links et appeler createRecording
-function processLinks() {
+export function processLinks() {
     const db = getDatabase();
 
     if (!db) {
@@ -158,7 +157,7 @@ function processLinks() {
     //console.log("Tout les lignes on été traitées");
 }
 
-async function cam4Url(name, url, callback) {
+export async function cam4Url(name, url, callback) {
     try{
         browser = await puppeteer.launch({
             args: ['--disable-gpu']
@@ -219,7 +218,7 @@ async function cam4Url(name, url, callback) {
     }
 }
 
-function striptchatUrl(name, data)
+export function striptchatUrl(name, data)
 {
     // Pour extraire la sous-chaîne entre \"streamName\":\" et \"
     const streamNameMatch = data.match(/\"streamName\":\"(.*?)\"/);
@@ -262,7 +261,7 @@ function striptchatUrl(name, data)
 
 }
 
-function chaturbateUrl(name, data)
+export function chaturbateUrl(name, data)
 {
     const correctedResponse = data.replace(/\\u002D|\\u0022/g, (match) => {
         switch (match) {
@@ -285,7 +284,7 @@ function chaturbateUrl(name, data)
     }
 }
 
-function killAProcess(name)
+export function killAProcess(name)
 {
     // Obtenir un processus associé à une clé qui n'existe pas
     const process = processes.get(name);
@@ -300,7 +299,7 @@ function killAProcess(name)
     // else : Nothing to do
 }
 
-function killAllProcesses()
+export function killAllProcesses()
 {
     processes.forEach((process) => {
         process.reject();
@@ -308,7 +307,7 @@ function killAllProcesses()
     })
 }
 
-function addNewModelfromUrl(modelUrl)
+export function addNewModelfromUrl(modelUrl)
 {
     const matchResult = modelUrl.match(/\.com\/(.*?)\/?$/);
     const website = modelUrl.match(/:\/\/(?:www\.)?(?:[a-zA-Z]+\.)?([a-zA-Z0-9_-]+)\.com\//);
@@ -319,76 +318,78 @@ function addNewModelfromUrl(modelUrl)
     }
 }
 
-function updateLinksStatus()
+export async function updateLinksStatus()
 {
-    getInfosFromTable("links", ["Name", "Url", "Website"])
-        .then((request) => {
-            request.forEach((row) => {
-                findPageInfo(row.Url)
-                    .then((data) => {
-                        switch (row.Website)
-                        {
-                            case Website.chaturbate:
-                            {
-                                const correctedResponse = data.replace(/\\u002D|\\u0022/g, (match) => {
-                                    switch (match) {
-                                        case '\\u002D':
-                                            return '-';
-                                        case '\\u0022':
-                                            return '"';
-                                        default:
-                                            return match;
-                                    }
-                                });
-                
-                                const streamNameMatch = correctedResponse.match(/room_status\": \"(.*?)\", \"num_viewer/);
-                                const streamName = streamNameMatch ? streamNameMatch[1] : null;
-                                switch (streamName) {
-                                    case RecordingStatus.public:
-                                    {
-                                        updateOnline(row.Name, true);
-                                        updateModelStatus(row.Name, RecordingStatus.public);
-                                        break;
-                                    }
-                                    case RecordingStatus.offline:
-                                    {
-                                        updateOnline(row.Name, false);
-                                        updateModelStatus(row.Name, RecordingStatus.offline);
-                                        break;
-                                    }
-                                    case RecordingStatus.private:
-                                    {
-                                        updateOnline(row.Name, false);
-                                        updateModelStatus(row.Name, RecordingStatus.private);
-                                        break;
-                                    }
-                                    default:
-                                    {
-                                        updateOnline(row.Name, false);
-                                        break;
-                                    }
-                                }
-                                break;
-                            }
-                            case Website.cam4:
-                            case Website.stripchat:
-                            {
-                                break;
-                            }
-                            default:
-                            {
-                                console.error("Website given does not supported : ", row.website)
-                                break;
-                            }
-                        }
-                    })
-                    .catch(err => console.error(err));
-            });
-        })
-        .catch(err => console.error(err));
+    let nameStatusMap = new Map();
+    const request = await getInfosFromTable("links", ["Name", "Url", "Website"]);
+    const promises = request.map(async (row) => {
+        const data = await findPageInfo(row.Url);
+        switch (row.Website)
+        {
+            case Website.chaturbate:
+            {
+                const correctedResponse = data.replace(/\\u002D|\\u0022/g, (match) => {
+                    switch (match) {
+                        case '\\u002D':
+                            return '-';
+                        case '\\u0022':
+                            return '"';
+                        default:
+                            return match;
+                    }
+                });
+
+                const streamNameMatch = correctedResponse.match(/room_status\": \"(.*?)\", \"num_viewer/);
+                const streamName = streamNameMatch ? streamNameMatch[1] : null;
+                nameStatusMap.set(row.Name, RecordingStatus.public);
+
+                console.log(streamName);
+                switch (streamName) {
+                    case RecordingStatus.public:
+                    {
+                        updateColumn(row.Name, 'Online', true);
+                        break;
+                    }
+                    case RecordingStatus.offline:
+                    {
+                        updateColumn(row.Name, 'Online', false);
+                        nameStatusMap.set(row.Name, RecordingStatus.offline);
+                        break;
+                    }
+                    case RecordingStatus.private:
+                    {
+                        updateColumn(row.Name, 'Online', false);
+                        nameStatusMap.set(row.Name, RecordingStatus.private);
+                        break;
+                    }
+                    default:
+                    {
+                        updateColumn(row.Name, 'Online', false);
+                        nameStatusMap.set(row.Name, RecordingStatus.offline);
+                        break;
+                    }
+                }
+                break;
+            }
+            case Website.cam4:
+            case Website.stripchat:
+            {
+                break;
+            }
+            default:
+            {
+                console.error("Website given does not supported : ", row.website)
+                break;
+            }
+        }
+    });
+
+    await Promise.all(promises);
+    console.log(nameStatusMap);
+    return nameStatusMap;
 }
 
-async function findPageInfo(url)
+export async function findPageInfo(url)
 {
     const response = await axios.get(url.replace(/\\u002D/g, '-'));
 
@@ -397,13 +398,3 @@ async function findPageInfo(url)
     return correctedResponse;
 
 }
-  
-// Exportez les fonctions pour qu'elles puissent être utilisées dans d'autres fichiers
-module.exports = {
-    createRecording,
-    processLinks,
-    killAProcess,
-    killAllProcesses,
-    addNewModelfromUrl,
-    updateLinksStatus,
-};

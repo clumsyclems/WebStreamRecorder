@@ -1,4 +1,4 @@
-const { contextBridge, ipcRenderer} = require('electron')
+import {contextBridge, ipcRenderer} from 'electron';
 
 contextBridge.exposeInMainWorld('versions', {
   node: () => process.versions.node,
@@ -9,5 +9,11 @@ contextBridge.exposeInMainWorld('versions', {
   changeRecordingStatus: (name, status) => ipcRenderer.invoke('changeRecordingStatus', {name, status}),
   removeARowFromName: (name) => ipcRenderer.invoke('removeARowFromName', name),
   addNewModel: (model) => ipcRenderer.invoke('addNewModel',model),
-  // we can also expose variables, not just functions
-})
+  updateModelStatus: (callback) => ipcRenderer.on('updateModelStatus', (event, model, status) => 
+  {
+    console.log(model, status);
+    callback(model, status);
+  }),
+
+  ready: () => ipcRenderer.send('Ready')
+});

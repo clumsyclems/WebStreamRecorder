@@ -1,26 +1,29 @@
-const { app, 
+import { app, 
         BrowserWindow, 
-        ipcMain } = require('electron');
+        ipcMain } from 'electron';
 
-const { createRecording,
+import { createRecording,
         processLinks, 
         killAProcess, 
         killAllProcesses,
         addNewModelfromUrl,
         updateLinksStatus
       }
-       = require('./script.cjs');
+       from './script.mjs';
 
-const { getAllLinks,
+import { getAllLinks,
         initializeDatabase,
         setAllOffline, 
         removeLinkFromName,
-        updateRecord,
         getInfosFromTableWithUrlConstraint,
+        updateColumn,
       } 
-      = require('./serveur.cjs');
-const cron = require('node-cron');
-const path = require('node:path');
+       from './serveur.mjs';
+import cron from 'node-cron';
+import path from 'node:path';
+import { fileURLToPath } from 'url';
+import { dirname } from 'path';
+import { RecordingStatus } from '../common/common.mjs';
 
 // Initialise la base de données
 initializeDatabase(app);
@@ -29,13 +32,13 @@ initializeDatabase(app);
 setAllOffline();
 
 let window = null;
-
 const createWindow = () => {
     window = new BrowserWindow({
       width: 800,
       height: 600,
       webPreferences: {
-        preload: path.join(__dirname, 'preload.js'),
+        sandbox: false,
+        preload: path.join(fileURLToPath(new URL('preload.mjs', import.meta.url)))
       }
     })
   
@@ -46,12 +49,13 @@ function initApplication()
 {
   createWindow()
   // À l'initialisation, parcourt la base de données pour lancer les enregistrements par défaut
-  updateLinksStatus();
+  //updateLinksStatus();
   processLinks();
 
   // Crée une tâche de fond pour vérifier et lancer les enregistrements par défaut de manière régulière (ici toutes les minutes)
   cron.schedule('*/1 * * * *', () => {
-    updateLinksStatus();
+    const statusUpdated = updateLinksStatus();
+    statusUpdated.forEach((keys, values) => updateModelStatus(keys, values));
     processLinks();
   });
 }
@@ -64,7 +68,7 @@ app.whenReady().then(() => {
     })
     ipcMain.handle('changeRecordingStatus', (event, args) => {
       const {name, status} = args;
-      return updateRecord(name, status);
+      return updateColumn(name, 'Record', status);
     });
     ipcMain.handle('removeARowFromName', (event, name) => {
       return removeLinkFromName(name);
@@ -78,22 +82,30 @@ app.whenReady().then(() => {
 
     initApplication();
 
+    ipcMain.on('Ready', async () => {
+      console.log('Ready');
+      const statusUpdated = await updateLinksStatus();
+      console.log(statusUpdated);
+      statusUpdated.forEach((keys, values) => updateModelStatus(keys, values));
+    });
+
     app.on('activate', () => {
       if (BrowserWindow.getAllWindows().length === 0) initApplication()
     })
 })
 
-function updateCurrentRecordingModel(recordingModel, action)
+export function updateCurrentRecordingModel(recordingModel, action)
 {
   window.webContents.send('updateCurrentRecordingModel', recordingModel, action);
 }
 
-function updateModelStatus()
+export function updateModelStatus(modelName, recordingStatus)
 {
-  window.webContents.send('updateCurrentRecordingModel', modelName, recordingStatus);
+  console.log(modelName, recordingStatus);
+  window.webContents.send('updateModelStatus', modelName, recordingStatus);
 }
 
-async function getModel(modelUrl)
+export async function getModel(modelUrl)
 {
   return getInfosFromTableWithUrlConstraint('links', ['*'], modelUrl);
 }
@@ -101,8 +113,3 @@ async function getModel(modelUrl)
 app.on('window-all-closed', () => {
     if (process.platform !== 'darwin') app.quit()
 })
-
-module.exports = {
-  updateCurrentRecordingModel,
-  updateModelStatus,
-}
