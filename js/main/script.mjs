@@ -341,13 +341,11 @@ export async function updateLinksStatus()
 
                 const streamNameMatch = correctedResponse.match(/room_status\": \"(.*?)\", \"num_viewer/);
                 const streamName = streamNameMatch ? streamNameMatch[1] : null;
-                nameStatusMap.set(row.Name, RecordingStatus.public);
-
-                console.log(streamName);
                 switch (streamName) {
                     case RecordingStatus.public:
                     {
                         updateColumn(row.Name, 'Online', true);
+                        nameStatusMap.set(row.Name, RecordingStatus.public);
                         break;
                     }
                     case RecordingStatus.offline:
@@ -385,9 +383,10 @@ export async function updateLinksStatus()
     });
 
     await Promise.all(promises);
-    console.log(nameStatusMap);
     return nameStatusMap;
 }
+
+
 
 export async function findPageInfo(url)
 {

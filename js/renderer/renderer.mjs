@@ -108,11 +108,11 @@ function addNewModelEvent()
 }
 
 window.versions.updateModelStatus((model, status) => {
-    console.log(model, status);
-    /*let sameStatus = document.getElementById(`${model}`).classList.contains(`${status}`);
-    if(!sameStatus)
+
+    let statusUnchange = document.getElementById(`${model}`).classList.contains(`${status}`);
+    if(!statusUnchange)
     {
-        for(recordingStatus in RecordingStatus)
+        for(const recordingStatus in RecordingStatus)
         {
             if(RecordingStatus[recordingStatus] == status)
             {
@@ -123,7 +123,7 @@ window.versions.updateModelStatus((model, status) => {
                 document.getElementById(`${model}`).classList.remove(`${RecordingStatus[recordingStatus]}`);
             }
         }
-    }*/
+    }
 });
 
 window.versions.ready();

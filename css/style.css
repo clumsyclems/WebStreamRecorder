@@ -124,7 +124,10 @@ body section#recordingArray table tbody tr {
   width: 100%;
   align-items: center;
 }
-body section#recordingArray table tbody tr.recording td {
+body section#recordingArray table tbody tr.public td {
+  background-color: #3887BE;
+}
+body section#recordingArray table tbody tr.recording.public, body section#recordingArray table tbody tr.public.recording td {
   background-color: #52D3D8;
 }
 body section#recordingArray table tbody tr th,

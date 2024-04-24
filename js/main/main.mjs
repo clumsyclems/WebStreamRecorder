@@ -76,17 +76,14 @@ app.whenReady().then(() => {
     ipcMain.handle('addNewModel', async (event, modelUrl) => {
       addNewModelfromUrl(modelUrl);
       const model = await getModel(modelUrl);
-      //console.log(model);
       return model;
     });
 
     initApplication();
 
     ipcMain.on('Ready', async () => {
-      console.log('Ready');
       const statusUpdated = await updateLinksStatus();
-      console.log(statusUpdated);
-      statusUpdated.forEach((keys, values) => updateModelStatus(keys, values));
+      statusUpdated.forEach((values, keys) => updateModelStatus(keys, values));
     });
 
     app.on('activate', () => {
@@ -101,7 +98,6 @@ export function updateCurrentRecordingModel(recordingModel, action)
 
 export function updateModelStatus(modelName, recordingStatus)
 {
-  console.log(modelName, recordingStatus);
   window.webContents.send('updateModelStatus', modelName, recordingStatus);
 }
 

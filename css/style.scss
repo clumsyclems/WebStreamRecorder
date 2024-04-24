@@ -158,7 +158,11 @@ body {
                     width: 100%;
                     align-items: center;
 
-                    &.recording td {
+                    &.public td {
+                        background-color: $dark-turquoise;
+                    }
+
+                    &.recording.public, &.public.recording  td {
                         background-color: $turquoise;
                     }
 

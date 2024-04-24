@@ -11,7 +11,6 @@ contextBridge.exposeInMainWorld('versions', {
   addNewModel: (model) => ipcRenderer.invoke('addNewModel',model),
   updateModelStatus: (callback) => ipcRenderer.on('updateModelStatus', (event, model, status) => 
   {
-    console.log(model, status);
     callback(model, status);
   }),
 
