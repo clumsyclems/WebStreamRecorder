@@ -7,7 +7,6 @@ body section {
   justify-content: center;
   min-width: 100%;
   max-height: 500px;
-  overflow-y: auto;
 }
 body section div {
   display: flex;
@@ -90,11 +89,6 @@ body section#currentRecordings table td {
   color: #1D24CA;
   border-top: 2px solid #38419D;
 }
-body section#currentRecordings table td.actions * {
-  min-width: 40%;
-  margin-right: 4%;
-  margin-left: 4%;
-}
 body section#recordingArray table {
   display: flex;
   flex-direction: column;
@@ -108,7 +102,7 @@ body section#recordingArray table caption {
   background-color: #1D24CA;
   font-weight: bold;
   color: #F9E8C9;
-  min-width: 100%;
+  max-width: 100%;
 }
 body section#recordingArray table tbody {
   display: flex;
@@ -116,12 +110,12 @@ body section#recordingArray table tbody {
   align-items: center;
   flex-wrap: wrap;
   justify-content: center;
-  min-width: 100%;
+  max-width: 100%;
 }
 body section#recordingArray table tbody tr {
   display: flex;
   flex-direction: row;
-  width: 100%;
+  min-width: 100%;
   align-items: center;
 }
 body section#recordingArray table tbody tr.public td {

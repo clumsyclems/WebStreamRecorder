@@ -19,7 +19,6 @@ body {
     justify-content: center;
     min-width: 100%;
     max-height: 500px;
-    overflow-y: auto;
 
     div {
         display: flex;
@@ -115,13 +114,7 @@ body {
                 align-items: center;
                 background-color: $yellow;
                 color: $dark-blue;
-                border-top: 2px solid $navy;  
-                
-                &.actions * {
-                    min-width: 40%;
-                    margin-right: 4%;
-                    margin-left: 4%;
-                }
+                border-top: 2px solid $navy;
             }
         }
     }
@@ -141,7 +134,7 @@ body {
                 background-color: $dark-blue;
                 font-weight: bold;
                 color: $yellow;
-                min-width: 100%;
+                max-width: 100%;
             }
 
             tbody {
@@ -150,12 +143,12 @@ body {
                 align-items: center;
                 flex-wrap: wrap;
                 justify-content: center;
-                min-width: 100%;
-                
+                max-width: 100%;
+
                 tr {
                     display: flex;
                     flex-direction: row;
-                    width: 100%;
+                    min-width: 100%;
                     align-items: center;
 
                     &.public td {

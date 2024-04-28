@@ -323,7 +323,16 @@ export async function updateLinksStatus()
     let nameStatusMap = new Map();
     const request = await getInfosFromTable("links", ["Name", "Url", "Website"]);
     const promises = request.map(async (row) => {
-        const data = await findPageInfo(row.Url);
+        nameStatusMap.set(...(await updateLinkStatus(row)));
+    });
+
+    await Promise.all(promises);
+    return nameStatusMap;
+}
+
+export async function updateLinkStatus(row)
+{
+    const data = await findPageInfo(row.Url);
         switch (row.Website)
         {
             case Website.chaturbate:
@@ -345,26 +354,22 @@ export async function updateLinksStatus()
                     case RecordingStatus.public:
                     {
                         updateColumn(row.Name, 'Online', true);
-                        nameStatusMap.set(row.Name, RecordingStatus.public);
-                        break;
+                        return [row.Name, RecordingStatus.public];
                     }
                     case RecordingStatus.offline:
                     {
                         updateColumn(row.Name, 'Online', false);
-                        nameStatusMap.set(row.Name, RecordingStatus.offline);
-                        break;
+                        return [row.Name, RecordingStatus.offline];
                     }
                     case RecordingStatus.private:
                     {
                         updateColumn(row.Name, 'Online', false);
-                        nameStatusMap.set(row.Name, RecordingStatus.private);
-                        break;
+                        return [row.Name, RecordingStatus.private];
                     }
                     default:
                     {
                         updateColumn(row.Name, 'Online', false);
-                        nameStatusMap.set(row.Name, RecordingStatus.offline);
-                        break;
+                        return [row.Name, RecordingStatus.offline];
                     }
                 }
                 break;
@@ -372,21 +377,15 @@ export async function updateLinksStatus()
             case Website.cam4:
             case Website.stripchat:
             {
-                break;
+                return [row.Name, RecordingStatus.offline];
             }
             default:
             {
                 console.error("Website given does not supported : ", row.website)
-                break;
+                return [row.Name, RecordingStatus.offline];
             }
         }
-    });
-
-    await Promise.all(promises);
-    return nameStatusMap;
 }
-
-
 
 export async function findPageInfo(url)
 {

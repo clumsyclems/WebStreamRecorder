@@ -50,20 +50,27 @@ function updateCheckboxStatus(){
 async function fillRecordingArray() {
     const ask = await window.versions.fillRecordingArray();
     ask.forEach(row => {
-        insertNewRow(row, false);
+        insertNewRow(row);
     });
 }
 
 function insertNewRow(row) {
-    const table = document.querySelector('section#recordingArray table');
+    let table = document.querySelector('section#recordingArray table'); 
+    let tr =  table.querySelector('tbody tr.header');
+    let rowPlace = 0;
+    do{
+        tr = tr.nextElementSibling;
+        ++rowPlace;
+    }while(tr != null && tr.id.localeCompare(row.Name) < 0)
 
     //Add new row
-    let newRow = table.insertRow();
+    let newRow = table.insertRow(rowPlace);
 
+    //Set the class list and id of the new row
     if(row.Record){newRow.classList.add('recording')};
+    newRow.id = row.Name ;
     
     //Insert the name of each row
-    newRow.id = row.Name ;
     let name = newRow.insertCell(0);
     name.classList.add('name');
     name.innerHTML = row.Name;
@@ -101,9 +108,10 @@ function addNewModelEvent()
 
         const input = e.target.previousElementSibling;
         window.versions.addNewModel(input.value).then((resolve) => {
-            resolve.forEach(row => insertNewRow(row, true));
+            resolve.forEach(row => insertNewRow(row));
         })
         .catch((error) => console.error(error));
+        input.value = '';
     })
 }
 
