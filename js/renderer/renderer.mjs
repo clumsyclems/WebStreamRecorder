@@ -1,30 +1,4 @@
 import {RecordingStatus} from '../common/common.mjs';
-//Add a eventlistener to all checkboxes to change the line class
-
-function addInputChangeStyleEvent(){
-    document.querySelectorAll('input.switch[type="checkbox"]').forEach(item => {
-        item.addEventListener('change', (e) => {
-            const row = e.target.closest('tr');
-            const name = row.getElementsByClassName('name')[0].innerHTML;
-            window.versions.changeRecordingStatus(name, e.target.checked)
-                .then((resolve) => {
-                    if (e.target.checked) {
-                        row.classList.add('recording');
-                    } else {
-                        row.classList.remove('recording');
-                    }
-                    /** @todo notification panel appears to notify the user */
-                    if(resolve) 
-                    {
-                        console.log(resolve);
-                    } 
-                })
-                .catch(err => {
-                    console.error(err);
-                });
-        })
-    })
-}
 
 //test info exchange between main and renderer process
 const func = async () => {
@@ -87,6 +61,26 @@ function insertNewRow(row) {
     newInput.classList.add('switch')
     newInput.type = 'checkbox';
     newInput.checked = row.Record;
+    newInput.addEventListener('change', (e) => {
+        const row = e.target.closest('tr');
+        const name = row.getElementsByClassName('name')[0].innerHTML;
+        window.versions.changeRecordingStatus(name, e.target.checked)
+            .then((resolve) => {
+                if (e.target.checked) {
+                    row.classList.add('recording');
+                } else {
+                    row.classList.remove('recording');
+                }
+                /** @todo notification panel appears to notify the user */
+                if(resolve) 
+                {
+                    console.log(resolve);
+                } 
+            })
+            .catch(err => {
+                console.error(err);
+            });
+    })
     autoRecording.appendChild(newInput);
 
     //Insert the delete button
@@ -108,7 +102,10 @@ function addNewModelEvent()
 
         const input = e.target.previousElementSibling;
         window.versions.addNewModel(input.value).then((resolve) => {
-            resolve.forEach(row => insertNewRow(row));
+            resolve.forEach(row => {
+                insertNewRow(row);
+                window.versions.updateModelOnlineStatus(row.Url);
+            });
         })
         .catch((error) => console.error(error));
         input.value = '';
@@ -116,7 +113,7 @@ function addNewModelEvent()
 }
 
 window.versions.updateModelStatus((model, status) => {
-
+    console.log('received update');
     let statusUnchange = document.getElementById(`${model}`).classList.contains(`${status}`);
     if(!statusUnchange)
     {
@@ -139,6 +136,5 @@ window.versions.ready();
 func();
 fillRecordingArray().then(() => {
     addNewModelEvent();
-    addInputChangeStyleEvent();
     updateCheckboxStatus();
 });

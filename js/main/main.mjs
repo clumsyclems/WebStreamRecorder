@@ -7,7 +7,8 @@ import { createRecording,
         killAProcess, 
         killAllProcesses,
         addNewModelfromUrl,
-        updateLinksStatus
+        updateLinksStatus,
+        updateLinkStatus
       }
        from './script.mjs';
 
@@ -20,10 +21,11 @@ import { getAllLinks,
       } 
        from './serveur.mjs';
 import cron from 'node-cron';
-import path from 'node:path';
+import path, { resolve } from 'node:path';
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';
 import { RecordingStatus } from '../common/common.mjs';
+import { ADDRGETNETWORKPARAMS } from 'node:dns';
 
 // Initialise la base de données
 initializeDatabase(app);
@@ -79,6 +81,12 @@ app.whenReady().then(() => {
       return model;
     });
 
+    ipcMain.on('UpdateModelOnlineStatus', async (event, model) => {
+      const modelRow = await getModel(model.modelUrl);
+      const [name, status] = await updateLinkStatus(modelRow[0]);
+      updateModelStatus(name, status);
+    });
+
     initApplication();
 
     ipcMain.on('Ready', async () => {
@@ -103,7 +111,7 @@ export function updateModelStatus(modelName, recordingStatus)
 
 export async function getModel(modelUrl)
 {
-  return getInfosFromTableWithUrlConstraint('links', ['*'], modelUrl);
+  return await getInfosFromTableWithUrlConstraint('links', ['*'], modelUrl);
 }
 
 app.on('window-all-closed', () => {

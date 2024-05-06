@@ -154,12 +154,12 @@ export function getInfosFromTableWithNameConstraint(table, params = [], name){
 
 export function getInfosFromTableWithUrlConstraint(table, params = [], url){
   return new Promise((resolve, reject) => {
-    db.all(`SELECT ${params.join(', ')} FROM ${table} WHERE Url = '${url}'`, (err, rows) => {
+    const query = `SELECT ${params.join(', ')} FROM ${table} WHERE Url = ?`;
+    db.all(query, [url], (err, rows) => {
       if(err) {
         reject(err);
         return;
       }
-
       resolve(rows);
     });
   });

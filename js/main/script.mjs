@@ -45,27 +45,27 @@ export async function createRecording(url, name, website) {
     }
     catch (error) {
         if (error.code === 'ECONNRESET' || error.code === 'ECONNABORTED') {
-            console.error('Erreur lors de la récupération de la page: ECONNRESET ou ECONNABORTED pour ', name);
+            console.error('Erreur lors de la recuperation de la page: ECONNRESET ou ECONNABORTED pour ', name);
         }
         else if (error.response && error.response.status === 403)
         {
-            console.error('Erreur lors de la récupération de la page: Error 403 Forbidden pour ', name);
+            console.error('Erreur lors de la recuperation de la page: Error 403 Forbidden pour ', name);
         }
         else if (error.response && error.response.status === 404)
         {
-            console.error('Erreur lors de la récupération de la page: Error 404 Access Denied pour ', name);
+            console.error('Erreur lors de la recuperation de la page: Error 404 Access Denied pour ', name);
         }
         else if (error.response && error.response.status === 429) {
-            console.error('Erreur lors de la récupération de la page: Error 429 Too many requests');
+            console.error('Erreur lors de la recuperation de la page: Error 429 Too many requests');
             await new Promise(resolve => setTimeout(resolve, 30000));
             await createRecording(url, name, website);
         }
         else if (error.response && error.response.status === 502)
         {
-            console.error('Erreur lors de la récupération de la page: Error 502 Bad Gateway pour ', name);
+            console.error('Erreur lors de la recuperation de la page: Error 502 Bad Gateway pour ', name);
         }
         else {
-            console.error('Erreur lors de la récupération de la page HTML pour :', name, error);
+            console.error('Erreur lors de la recuperation de la page HTML pour :', name, error);
         }
     }
 }
@@ -108,23 +108,23 @@ export async function ffmpegRecordRequest(m3u8Url, name )
     catch (error) {
         if (error.response && error.response.status === 403)
         {
-            console.error('Erreur lors de la récupération de la page: Error 403 Forbidden access pour :', name);
+            console.error('Erreur lors de la recuperation de la page: Error 403 Forbidden access pour :', name);
         }
         else if (error.response && error.response.status === 404)
         {
-            console.error('Erreur lors de la récupération de la page: Error 404 Access Denied pour :', name);
+            console.error('Erreur lors de la recuperation de la page: Error 404 Access Denied pour :', name);
         }
         else if (error.response && error.response.status === 429) {
-            console.error('Erreur lors de la récupération de la page: Error 429 Too many requests pour :', name);
+            console.error('Erreur lors de la recuperation de la page: Error 429 Too many requests pour :', name);
             await new Promise(resolve => setTimeout(resolve, 30000));
             await createRecording(url, name, website);
         }
         else if (error.response && error.response.status === 502)
         {
-            console.error('Erreur lors de la récupération de la page: Error 502 Bad Gateway pour :', name);
+            console.error('Erreur lors de la recuperation de la page: Error 502 Bad Gateway pour :', name);
         }
         else {
-            console.error('Erreur lors de la récupération de la page HTML pour :', name, error);
+            console.error('Erreur lors de la recuperation de la page HTML pour :', name, error);
         }
     }
 }
@@ -140,7 +140,7 @@ export function processLinks() {
 
     db.all('SELECT * FROM links WHERE Online = 1 AND Record = 1', (err, rows) => {
         if (err) {
-            console.error('Erreur lors de la récupération des éléments de la table links:', err);
+            console.error('Erreur lors de la recuperation des éléments de la table links:', err);
         } else {
             rows.forEach((row) => {
                 const { Name, Url, Website} = row;
@@ -337,7 +337,7 @@ export async function updateLinkStatus(row)
         {
             case Website.chaturbate:
             {
-                const correctedResponse = data.replace(/\\u002D|\\u0022/g, (match) => {
+                let correctedResponse = data.replace(/\\u002D|\\u0022/g, (match) => {
                     switch (match) {
                         case '\\u002D':
                             return '-';
@@ -347,32 +347,17 @@ export async function updateLinkStatus(row)
                             return match;
                     }
                 });
-
-                const streamNameMatch = correctedResponse.match(/room_status\": \"(.*?)\", \"num_viewer/);
+                const streamNameMatch = correctedResponse.match(/"room_status": "(.*?)"/);
+                //const streamNameMatch = correctedResponse.match(/room_status\": \"(.*?)\", \"num_viewer/);
                 const streamName = streamNameMatch ? streamNameMatch[1] : null;
-                switch (streamName) {
-                    case RecordingStatus.public:
-                    {
-                        updateColumn(row.Name, 'Online', true);
-                        return [row.Name, RecordingStatus.public];
-                    }
-                    case RecordingStatus.offline:
-                    {
-                        updateColumn(row.Name, 'Online', false);
-                        return [row.Name, RecordingStatus.offline];
-                    }
-                    case RecordingStatus.private:
-                    {
-                        updateColumn(row.Name, 'Online', false);
-                        return [row.Name, RecordingStatus.private];
-                    }
-                    default:
-                    {
-                        updateColumn(row.Name, 'Online', false);
-                        return [row.Name, RecordingStatus.offline];
-                    }
+                let recordingStatus = RecordingStatus.offline;
+                if (streamName === RecordingStatus.public) {
+                    recordingStatus = RecordingStatus.public;
+                } else if (streamName === RecordingStatus.offline || streamName === RecordingStatus.private) {
+                    recordingStatus = streamName;
                 }
-                break;
+                updateColumn(row.Name, 'Online', recordingStatus === RecordingStatus.public);
+                return [row.Name, recordingStatus];
             }
             case Website.cam4:
             case Website.stripchat:
@@ -389,10 +374,21 @@ export async function updateLinkStatus(row)
 
 export async function findPageInfo(url)
 {
-    const response = await axios.get(url.replace(/\\u002D/g, '-'));
+    try{
 
-    const correctedResponse = response.data.replace(/\\u002D/g, '-');
-
-    return correctedResponse;
+        const response = await axios.get(url.replace(/\\u002D/g, '-'));
+    
+        const correctedResponse = response.data.replace(/\\u002D/g, '-');
+    
+        return correctedResponse;
+    }
+    catch(error)
+    {
+        if (error.response && error.response.status === 429) {
+            console.error('Erreur lors de la recuperation de la page: Error 429 Too many requests');
+            await new Promise(resolve => setTimeout(resolve, 30000));
+            await findPageInfo(url);
+        }
+    }
 
 }
