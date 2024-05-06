@@ -14,7 +14,7 @@ contextBridge.exposeInMainWorld('versions', {
     callback(model, status);
   }),
 
-  updateModelOnlineStatus: (modelUrl) => ipcRenderer.send('UpdateModelOnlineStatus', {modelUrl}),
+  updateModelOnlineStatus: (modelUrl) => ipcRenderer.send('updateModelOnlineStatus', {modelUrl}),
 
   ready: () => ipcRenderer.send('Ready')
 });

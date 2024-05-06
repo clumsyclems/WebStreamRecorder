@@ -8,7 +8,8 @@ import { createRecording,
         killAllProcesses,
         addNewModelfromUrl,
         updateLinksStatus,
-        updateLinkStatus
+        updateLinkStatus,
+        startRecording
       }
        from './script.mjs';
 
@@ -17,6 +18,7 @@ import { getAllLinks,
         setAllOffline, 
         removeLinkFromName,
         getInfosFromTableWithUrlConstraint,
+        getInfosFromTableWithNameConstraint,
         updateColumn,
       } 
        from './serveur.mjs';
@@ -25,8 +27,6 @@ import path, { resolve } from 'node:path';
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';
 import { RecordingStatus } from '../common/common.mjs';
-import { ADDRGETNETWORKPARAMS } from 'node:dns';
-
 // Initialise la base de données
 initializeDatabase(app);
 
@@ -55,8 +55,8 @@ function initApplication()
   processLinks();
 
   // Crée une tâche de fond pour vérifier et lancer les enregistrements par défaut de manière régulière (ici toutes les minutes)
-  cron.schedule('*/1 * * * *', () => {
-    const statusUpdated = updateLinksStatus();
+  cron.schedule('*/1 * * * *', async () => {
+    const statusUpdated = await updateLinksStatus();
     statusUpdated.forEach((keys, values) => updateModelStatus(keys, values));
     processLinks();
   });
@@ -68,8 +68,13 @@ app.whenReady().then(() => {
       const links = getAllLinks();
       return links;
     })
-    ipcMain.handle('changeRecordingStatus', (event, args) => {
+    ipcMain.handle('changeRecordingStatus', async (event, args) => {
       const {name, status} = args;
+      if(status == true)
+      {
+        const recordingstatus = await startRecording(name);
+        updateModelStatus(name, recordingstatus);
+      }
       return updateColumn(name, 'Record', status);
     });
     ipcMain.handle('removeARowFromName', (event, name) => {
@@ -77,12 +82,12 @@ app.whenReady().then(() => {
     });
     ipcMain.handle('addNewModel', async (event, modelUrl) => {
       addNewModelfromUrl(modelUrl);
-      const model = await getModel(modelUrl);
+      const model = await getModelFromUrl(modelUrl);
       return model;
     });
 
-    ipcMain.on('UpdateModelOnlineStatus', async (event, model) => {
-      const modelRow = await getModel(model.modelUrl);
+    ipcMain.on('updateModelOnlineStatus', async (event, model) => {
+      const modelRow = await getModelFromUrl(model.modelUrl);
       const [name, status] = await updateLinkStatus(modelRow[0]);
       updateModelStatus(name, status);
     });
@@ -109,9 +114,14 @@ export function updateModelStatus(modelName, recordingStatus)
   window.webContents.send('updateModelStatus', modelName, recordingStatus);
 }
 
-export async function getModel(modelUrl)
+export async function getModelFromUrl(modelUrl)
 {
   return await getInfosFromTableWithUrlConstraint('links', ['*'], modelUrl);
+}
+
+export async function getModelFromName(modelName)
+{
+  return await getInfosFromTableWithNameConstraint('links', ['*'], modelName);
 }
 
 app.on('window-all-closed', () => {

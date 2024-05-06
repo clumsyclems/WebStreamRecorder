@@ -2,11 +2,19 @@
 import axios from 'axios';
 import ffmpeg from 'fluent-ffmpeg';
 import dayjs from 'dayjs';
-import { getDatabase, insertOrUpdateInLinksTable, getInfosFromTable, updateColumn} from './serveur.mjs';
+import { getDatabase, 
+         insertOrUpdateInLinksTable, 
+         getInfosFromTable, 
+         updateColumn, 
+         getInfosFromTableWithNameConstraint,
+        } from './serveur.mjs';
 import { Website, RecordingStatus, Action} from '../common/common.mjs';
 import puppeteer from 'puppeteer';
-const processes = new Map();
-  
+import pathToFfmpeg from 'ffmpeg-static';
+import path from 'node:path';
+import {fileURLToPath} from 'url';
+ffmpeg.setFfmpegPath(pathToFfmpeg);
+let processes = new Map();
 let browser;
 let page;
 
@@ -73,17 +81,22 @@ export async function createRecording(url, name, website) {
 export async function ffmpegRecordRequest(m3u8Url, name )
 {
     try {
-        const outputPath = `./records/${name}_${dayjs().format("YYYY_MM_DD_HH_mm_ss")}.mkv`;
+        //Start from thr current file directory to go inside the 
+        const grandParentDirectory = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..', 'records');
+
+        const outputPath = path.join(grandParentDirectory, `${name}_${dayjs().format("YYYY_MM_DD_HH_mm_ss")}.mkv`);
 
         if(m3u8Url == null || m3u8Url === '' || m3u8Url.includes("/_auto"))
         {
             return;
         }
 
-        if (name) {
-            updateColumn(name, 'Online', true);
+        if (processes.get(name) != null)
+        {
+            processes.get(name).kill();
 
         }
+
         processes.set(name , ffmpeg(m3u8Url).output(outputPath)
                                             .native()
                                             .outputOptions('-c copy')
@@ -99,11 +112,12 @@ export async function ffmpegRecordRequest(m3u8Url, name )
                                                 updateColumn(name, 'Online', false);
                                                 console.log('Video recorder ended for: ', name);
                                             })
-                                            .on('error', () => {
+                                            .on('error', (error) => {
                                                 updateColumn(name, 'Online', false);
                                                 console.error('Video recorder error for: ', name);
+                                                console.error(error.message);
                                             }));
-        //processes.get(name).run();
+        processes.get(name).run();
     }
     catch (error) {
         if (error.response && error.response.status === 403)
@@ -146,9 +160,6 @@ export function processLinks() {
                 const { Name, Url, Website} = row;
                 if (processes.get(Name) === undefined) {
                     createRecording(Url, Name, Website);
-                }
-                else{
-                    console.error('La valeur existe déjà')
                 }
             });
         }
@@ -391,4 +402,20 @@ export async function findPageInfo(url)
         }
     }
 
+}
+
+export async function startRecording(modelName)
+{
+    const modelRow = await getInfosFromTableWithNameConstraint('links', ['*'], modelName);
+    try {
+        const [name, status] = await updateLinkStatus(modelRow[0]);
+        if(status == RecordingStatus.public)
+        {
+            createRecording(modelRow[0].Url, modelRow[0].Name, modelRow[0].Website);
+        }            
+        return status;
+    } catch (error) {
+        console.error(error.message);
+        return RecordingStatus.offline;
+    }
 }

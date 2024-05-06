@@ -139,14 +139,13 @@ export function getInfosFromTable(table, params = []){
 }
 
 export function getInfosFromTableWithNameConstraint(table, params = [], name){
-  const query = `SELECT  ${params.join(', ')} FROM ${table} WHERE Name = '${name}'`;
   return new Promise((resolve, reject) => {
-    db.all(query, (err, rows) => {
+    const query = `SELECT ${params.join(', ')} FROM ${table} WHERE Name = ?`;
+    db.all(query, [name], (err, rows) => {
       if(err) {
         reject(err);
         return;
       }
-
       resolve(rows);
     });
   });
