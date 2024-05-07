@@ -51,13 +51,16 @@ function initApplication()
 {
   createWindow()
   // À l'initialisation, parcourt la base de données pour lancer les enregistrements par défaut
-  //updateLinksStatus();
+  updateLinksStatus();
   processLinks();
 
   // Crée une tâche de fond pour vérifier et lancer les enregistrements par défaut de manière régulière (ici toutes les minutes)
-  cron.schedule('*/1 * * * *', async () => {
+  cron.schedule('*/10 * * * *', async () => {
     const statusUpdated = await updateLinksStatus();
-    statusUpdated.forEach((keys, values) => updateModelStatus(keys, values));
+    statusUpdated.forEach((value, keys) => {
+      //console.log(`the name : ${keys} and the value : ${value}`)
+      updateModelStatus(keys, value);
+    });
     processLinks();
   });
 }
@@ -75,6 +78,10 @@ app.whenReady().then(() => {
         const recordingstatus = await startRecording(name);
         updateModelStatus(name, recordingstatus);
       }
+      else
+      {
+        killAProcess(name);
+      }
       return updateColumn(name, 'Record', status);
     });
     ipcMain.handle('removeARowFromName', (event, name) => {
@@ -89,7 +96,15 @@ app.whenReady().then(() => {
     ipcMain.on('updateModelOnlineStatus', async (event, model) => {
       const modelRow = await getModelFromUrl(model.modelUrl);
       const [name, status] = await updateLinkStatus(modelRow[0]);
-      updateModelStatus(name, status);
+      if(name == null || status == null)
+      {
+        console.error(`Couldn\'t find one value between name : ${name} and status : ${status} \nFrom model : ${model} and modelRow : ${modelRow}`);
+        return;
+      }
+      else
+      {
+        updateModelStatus(name, status);
+      }
     });
 
     initApplication();
@@ -104,26 +119,27 @@ app.whenReady().then(() => {
     })
 })
 
-export function updateCurrentRecordingModel(recordingModel, action)
+function updateCurrentRecordingModel(recordingModel, action)
 {
   window.webContents.send('updateCurrentRecordingModel', recordingModel, action);
 }
 
-export function updateModelStatus(modelName, recordingStatus)
+function updateModelStatus(modelName, recordingStatus)
 {
   window.webContents.send('updateModelStatus', modelName, recordingStatus);
 }
 
-export async function getModelFromUrl(modelUrl)
+async function getModelFromUrl(modelUrl)
 {
   return await getInfosFromTableWithUrlConstraint('links', ['*'], modelUrl);
 }
 
-export async function getModelFromName(modelName)
+async function getModelFromName(modelName)
 {
   return await getInfosFromTableWithNameConstraint('links', ['*'], modelName);
 }
 
 app.on('window-all-closed', () => {
-    if (process.platform !== 'darwin') app.quit()
+  killAllProcesses();
+  if (process.platform !== 'darwin') app.quit()
 })

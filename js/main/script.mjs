@@ -64,7 +64,7 @@ export async function createRecording(url, name, website) {
             console.error('Erreur lors de la recuperation de la page: Error 404 Access Denied pour ', name);
         }
         else if (error.response && error.response.status === 429) {
-            console.error('Erreur lors de la recuperation de la page: Error 429 Too many requests');
+            console.error('Erreur lors de la recuperation de la page: Error 429 Too many requests pour ', name);
             await new Promise(resolve => setTimeout(resolve, 30000));
             await createRecording(url, name, website);
         }
@@ -297,25 +297,19 @@ export function chaturbateUrl(name, data)
 
 export function killAProcess(name)
 {
-    // Obtenir un processus associé à une clé qui n'existe pas
-    const process = processes.get(name);
-
-    console.log("Type of process :" + typeof process );
-
-    // Vérifier si la valeur existe
-    /*if (process !== undefined) {
-        // Appeler la méthode kill sur le processus
-        process.reject();
-    } */
-    // else : Nothing to do
+    if(processes.has(name)) {
+        processes.get(name).kill();
+        processes.delete(name);
+    }
 }
 
 export function killAllProcesses()
 {
-    processes.forEach((process) => {
-        process.reject();
-        console.log("Type of process :" + typeof process );
-    })
+    for (let key of processes.keys()) 
+    {
+        processes.get(key).kill();
+        processes.delete(key);
+    }
 }
 
 export function addNewModelfromUrl(modelUrl)
@@ -344,6 +338,7 @@ export async function updateLinksStatus()
 export async function updateLinkStatus(row)
 {
     const data = await findPageInfo(row.Url);
+    try{
         switch (row.Website)
         {
             case Website.chaturbate:
@@ -359,7 +354,6 @@ export async function updateLinkStatus(row)
                     }
                 });
                 const streamNameMatch = correctedResponse.match(/"room_status": "(.*?)"/);
-                //const streamNameMatch = correctedResponse.match(/room_status\": \"(.*?)\", \"num_viewer/);
                 const streamName = streamNameMatch ? streamNameMatch[1] : null;
                 let recordingStatus = RecordingStatus.offline;
                 if (streamName === RecordingStatus.public) {
@@ -370,17 +364,51 @@ export async function updateLinkStatus(row)
                 updateColumn(row.Name, 'Online', recordingStatus === RecordingStatus.public);
                 return [row.Name, recordingStatus];
             }
-            case Website.cam4:
             case Website.stripchat:
+            {
+                let correctedResponse = data.replace(/\\u002D|\\u002F|\\u0022/g, (match) => {
+                    switch (match) {
+                        case '\\u002D':
+                            return '-';
+                        case '\\u002F':
+                            return '/';
+                        case '\\u0022':
+                            return '"';
+                        default:
+                            return match;
+                    }
+                });
+                const streamOnlineMatch = correctedResponse.match(/"isOnline":(.*?),"/);
+                
+                if(streamOnlineMatch[1] === "true")
+                {
+                    updateColumn(row.Name, 'Online', true);
+                    return [row.Name, RecordingStatus.public];
+                }
+                else
+                {
+                    updateColumn(row.Name, 'Online', false);
+                    return [row.Name, RecordingStatus.offline];
+                }               
+            }
+            case Website.cam4:
             {
                 return [row.Name, RecordingStatus.offline];
             }
             default:
             {
-                console.error("Website given does not supported : ", row.website)
+                console.error("Website given does not supported : ", row.Website)
                 return [row.Name, RecordingStatus.offline];
             }
         }
+    }
+    catch(error)
+    {
+        console.error(error.message);
+        console.error(`Error might come from the row value : \n${row.Name}`);
+        //console.error(`Error might come from the data value : \n${data}`);
+        return [row.Name, RecordingStatus.offline];
+    }
 }
 
 export async function findPageInfo(url)
@@ -396,7 +424,7 @@ export async function findPageInfo(url)
     catch(error)
     {
         if (error.response && error.response.status === 429) {
-            console.error('Erreur lors de la recuperation de la page: Error 429 Too many requests');
+            console.error(`Erreur lors de la recuperation de la page: Error 429 Too many requests for the url :\n${url}`);
             await new Promise(resolve => setTimeout(resolve, 30000));
             await findPageInfo(url);
         }
