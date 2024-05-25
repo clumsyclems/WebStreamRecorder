@@ -6,7 +6,7 @@ contextBridge.exposeInMainWorld('versions', {
   electron: () => process.versions.electron,
   ping:() => ipcRenderer.invoke('ping'),
   fillRecordingArray: () => ipcRenderer.invoke('fillRecordingArray'),
-  changeRecordingStatus: (name, status) => ipcRenderer.invoke('changeRecordingStatus', {name, status}),
+  changeOnlineStatus: (name, status) => ipcRenderer.invoke('changeOnlineStatus', {name, status}),
   removeARowFromName: (name) => ipcRenderer.invoke('removeARowFromName', name),
   addNewModel: (model) => ipcRenderer.invoke('addNewModel',model),
   updateModelStatus: (callback) => ipcRenderer.on('updateModelStatus', (event, model, status) => 

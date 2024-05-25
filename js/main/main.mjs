@@ -9,7 +9,8 @@ import { createRecording,
         addNewModelfromUrl,
         updateLinksStatus,
         updateLinkStatus,
-        startRecording
+        startRecording,
+        deleteLogFiles
       }
        from './script.mjs';
 
@@ -25,8 +26,11 @@ import { getAllLinks,
 import cron from 'node-cron';
 import path, { resolve } from 'node:path';
 import { fileURLToPath } from 'url';
-import { dirname } from 'path';
-import { RecordingStatus } from '../common/common.mjs';
+import { OnlineStatus, /*eventService*/ } from '../common/common.mjs';
+
+// Supprime tout les log de la session précédente
+await deleteLogFiles();
+
 // Initialise la base de données
 initializeDatabase(app);
 
@@ -47,21 +51,25 @@ const createWindow = () => {
     window.loadFile('./html/index.html')
 }
 
-function initApplication()
-{
-  createWindow()
-  // À l'initialisation, parcourt la base de données pour lancer les enregistrements par défaut
-  updateLinksStatus();
-  processLinks();
-
-  // Crée une tâche de fond pour vérifier et lancer les enregistrements par défaut de manière régulière (ici toutes les minutes)
-  cron.schedule('*/10 * * * *', async () => {
-    const statusUpdated = await updateLinksStatus();
-    statusUpdated.forEach((value, keys) => {
+async function updatingProcesses() {
+  const statusUpdated = await updateLinksStatus();
+    statusUpdated.forEach(async (value, keys) => {
       //console.log(`the name : ${keys} and the value : ${value}`)
       updateModelStatus(keys, value);
     });
-    processLinks();
+  processLinks();
+} 
+
+async function initApplication()
+{
+  createWindow()
+  // À l'initialisation, parcourt la base de données pour lancer les enregistrements par défaut
+  
+  await updatingProcesses();
+
+  // Crée une tâche de fond pour vérifier et lancer les enregistrements par défaut de manière régulière (ici toutes les minutes)
+  cron.schedule('*/10 * * * *', async () => {
+    await updatingProcesses();
   });
 }
 
@@ -71,7 +79,7 @@ app.whenReady().then(() => {
       const links = getAllLinks();
       return links;
     })
-    ipcMain.handle('changeRecordingStatus', async (event, args) => {
+    ipcMain.handle('changeOnlineStatus', async (event, args) => {
       const {name, status} = args;
       if(status == true)
       {
@@ -88,8 +96,13 @@ app.whenReady().then(() => {
       return removeLinkFromName(name);
     });
     ipcMain.handle('addNewModel', async (event, modelUrl) => {
-      addNewModelfromUrl(modelUrl);
-      const model = await getModelFromUrl(modelUrl);
+      console.log("add new model");
+      const isModelAdd = addNewModelfromUrl(modelUrl);
+      let model = [];
+      if(isModelAdd)
+      {
+        model = await getModelFromUrl(modelUrl); 
+      }
       return model;
     });
 
@@ -124,9 +137,9 @@ function updateCurrentRecordingModel(recordingModel, action)
   window.webContents.send('updateCurrentRecordingModel', recordingModel, action);
 }
 
-function updateModelStatus(modelName, recordingStatus)
+function updateModelStatus(modelName, onlineStatus)
 {
-  window.webContents.send('updateModelStatus', modelName, recordingStatus);
+  window.webContents.send('updateModelStatus', modelName, onlineStatus);
 }
 
 async function getModelFromUrl(modelUrl)
@@ -143,3 +156,7 @@ app.on('window-all-closed', () => {
   killAllProcesses();
   if (process.platform !== 'darwin') app.quit()
 })
+
+/*eventService.on('Arrest', (data) => {
+  updateModelStatus(data.name, OnlineStatus.offline);
+})*/

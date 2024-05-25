@@ -1,6 +1,7 @@
-// script.js
+// script.mjs
 import axios from 'axios';
 import ffmpeg from 'fluent-ffmpeg';
+import fs from 'fs';
 import dayjs from 'dayjs';
 import { getDatabase, 
          insertOrUpdateInLinksTable, 
@@ -8,15 +9,55 @@ import { getDatabase,
          updateColumn, 
          getInfosFromTableWithNameConstraint,
         } from './serveur.mjs';
-import { Website, RecordingStatus, Action} from '../common/common.mjs';
+import { Website, OnlineStatus, Action, /*eventService*/} from '../common/common.mjs';
 import puppeteer from 'puppeteer';
-import pathToFfmpeg from 'ffmpeg-static';
 import path from 'node:path';
 import {fileURLToPath} from 'url';
-ffmpeg.setFfmpegPath(pathToFfmpeg);
+import { exec } from 'child_process';
+import { setTimeout } from 'timers/promises';
+import { Console } from 'console';
+
+// Résoudre le chemin du fichier courant
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+// Construire le chemin vers ffmpeg.exe
+const ffmpegPath = path.resolve(__dirname, '..', '..', 'ffmpeg', 'bin', 'ffmpeg.exe');
+ffmpeg.setFfmpegPath(ffmpegPath);
+
 let processes = new Map();
 let browser;
 let page;
+
+const SEGMENTS_DIRECTORY = path.join(__dirname, 'segments');
+const LOGS_DIRECTORY = path.resolve(__dirname, '..', '..', 'logs');
+
+// Créer le répertoire pour les segments s'il n'existe pas
+if (!fs.existsSync(SEGMENTS_DIRECTORY)) {
+    fs.mkdirSync(SEGMENTS_DIRECTORY);
+}
+
+let downloadedSegments = new Set();
+
+// Fonction pour supprimer les fichiers .logs du dossiers .logs
+export async function deleteLogFiles() {
+    try {
+      const files = await fs.promises.readdir(LOGS_DIRECTORY);
+
+      for (const file of files) {
+        const filePath = path.join(LOGS_DIRECTORY, file);
+  
+        // Vérifiez si le fichier se termine par .log
+        if (file.endsWith('.log')) {
+          await fs.promises.unlink(filePath);
+        }
+      }
+  
+      console.log('Tous les fichiers .log ont été supprimés.');
+    } catch (error) {
+      console.error('Une erreur s\'est produite lors de la suppression des fichiers .log :', error);
+    }
+  }
 
 // Fonction pour effectuer l'enregistrement
 export async function createRecording(url, name, website) {
@@ -48,7 +89,7 @@ export async function createRecording(url, name, website) {
         }
 
         if(m3u8Url != null) {
-            ffmpegRecordRequest(m3u8Url, name)
+            ffmpegRecordRequest(m3u8Url, name, website)
         }
     }
     catch (error) {
@@ -78,16 +119,22 @@ export async function createRecording(url, name, website) {
     }
 }
 
-export async function ffmpegRecordRequest(m3u8Url, name )
+export async function ffmpegRecordRequest(m3u8Url, name, website)
 {
     try {
         //Start from thr current file directory to go inside the 
         const grandParentDirectory = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..', 'records');
+        
+        const logFilePath = path.join(LOGS_DIRECTORY, `${name}_${dayjs().format("YYYY_MM_DD_HH_mm_ss")}_ffmpeg.log`);
+        const logStream = fs.createWriteStream(logFilePath, { flags: 'a' });
+
 
         const outputPath = path.join(grandParentDirectory, `${name}_${dayjs().format("YYYY_MM_DD_HH_mm_ss")}.mkv`);
 
         if(m3u8Url == null || m3u8Url === '' || m3u8Url.includes("/_auto"))
         {
+            console.log('Something wrong with m3u8Url : ', m3u8Url);
+            console.log('So nothing will be records');
             return;
         }
 
@@ -96,28 +143,69 @@ export async function ffmpegRecordRequest(m3u8Url, name )
             processes.get(name).kill();
 
         }
-
+        
         processes.set(name , ffmpeg(m3u8Url).output(outputPath)
                                             .native()
-                                            .outputOptions('-c copy')
+                                            .videoCodec('copy')
+                                            .audioCodec('copy')
+                                            //.outputOptions('-bsf:a aac_adtstoasc') // Convertit l'en-tête audio AAC pour le format MP4
+                                            .outputOptions([
+                                                '-bsf:a aac_adtstoasc', // Convertit l'en-tête audio AAC pour le format MP4
+                                                '-avoid_negative_ts make_zero', // Évitez les timestamps négatifs
+                                                '-fflags +genpts+discardcorrupt', // Générez les pts et ignorez les segments corrompus
+                                                '-max_reload 1000', // Réessayez de recharger le m3u8 jusqu'à 1000 fois si nécessaire
+                                                '-timeout 1000000', // Timeout augmenté pour les demandes HTTP
+                                                '-reconnect 1', // Autoriser les tentatives de reconnexion
+                                                '-reconnect_at_eof 1', // Reconnexion à la fin de la sortie du fichier
+                                                '-reconnect_streamed 1', // Reconnexion pour les flux
+                                                '-reconnect_delay_max 2' // Délai maximal entre les tentatives de reconnexion
+                                            ])
+                                            .on('start', function(commandLine) {
+                                                logStream.write('Spawned Ffmpeg with command: ' + commandLine + '\n');
+                                            })
+                                            .on('progress', function(progress) {
+                                                logStream.write('Processing: ' + progress.percent + '% done\n');
+                                            })
+                                            .on('stderr', function(stderrLine) {
+                                                logStream.write('Stderr output: ' + stderrLine + '\n');
+                                            })
+                                            .on('stdout', function(stdoutLine) {
+                                                logStream.write('Stdout output: ' + stdoutLine + '\n');
+                                            })
+                                            .on('error', function(err, stdout, stderr) {
+                                                updateColumn(name, 'Online', false);
+                                                //eventService.emit('Arrest', { name });
+                                                processes.delete(name);
+                                                console.error('An error occurred see the logs for more details');
+                                                logStream.write('An error occurred: ' + err.message + '\n');
+                                                logStream.write('Stdout: ' + stdout + '\n');
+                                                logStream.write('Stderr: ' + stderr + '\n');
+                                            })
+                                            .on('end', function() {
+                                                updateColumn(name, 'Online', false);
+                                                //eventService.emit('Arrest', { name });
+                                                processes.delete(name);
+                                                console.log(`Processing finished for ${name}!`);
+                                                logStream.write('Processing finished!\n');
+                                                logStream.end();
+                                            })
                                             .on('exit', () => {
                                                 updateColumn(name, 'Online',false);
+                                                //eventService.emit('Arrest', { name });
+                                                processes.delete(name);
                                                 console.log('Video recorder exited for: ', name)
                                             })
                                             .on('close',  () => {
                                                 updateColumn(name, 'Online', false);
+                                                //eventService.emit('Arrest', { name });
+                                                processes.delete(name);
                                                 console.log('Video recorder closed for: ', name)
-                                            })
-                                            .on('end', () => {
-                                                updateColumn(name, 'Online', false);
-                                                console.log('Video recorder ended for: ', name);
-                                            })
-                                            .on('error', (error) => {
-                                                updateColumn(name, 'Online', false);
-                                                console.error('Video recorder error for: ', name);
-                                                console.error(error.message);
                                             }));
+        console.log(`Beginning of ${name} recording`);
         processes.get(name).run();
+        
+        //downloadSegments(m3u8Url, website);
+
     }
     catch (error) {
         if (error.response && error.response.status === 403)
@@ -229,6 +317,81 @@ export async function cam4Url(name, url, callback) {
     }
 }
 
+async function downloadSubPlaylist(subPlaylistUrl) {
+    try {
+        const response = await axios.get(subPlaylistUrl);
+        const subPlaylist = response.data;
+        const segmentUrls = subPlaylist.split('\n').filter(line => line.startsWith('https://') || line.endsWith('.ts'));
+
+        for (let segmentUrl of segmentUrls) {
+            if (!segmentUrl.startsWith('http')) {
+                segmentUrl = new URL(segmentUrl, subPlaylistUrl).href;
+            }
+
+            const segmentName = path.basename(segmentUrl);
+            const segmentPath = path.join(SEGMENTS_DIRECTORY, segmentName);
+
+            if (!downloadedSegments.has(segmentName)) {
+                const segmentResponse = await axios.get(segmentUrl, { responseType: 'stream' });
+                const outputStream = fs.createWriteStream(segmentPath);
+                segmentResponse.data.pipe(outputStream);
+                await new Promise((resolve) => {
+                    outputStream.on('finish', async () => {
+                        console.log(`Segment téléchargé : ${segmentName}`);
+                        downloadedSegments.add(segmentName);
+    
+                        // Une fois que le segment est téléchargé, utilisez ffmpeg pour le convertir en MP4
+                        const outputFilePath = path.join(SEGMENTS_DIRECTORY, segmentName.replace('.ts', '.mp4'));
+                        await new Promise((resolve, reject) => {
+                            ffmpeg(segmentPath)
+                                .output(outputFilePath)
+                                .on('end', resolve)
+                                .on('error', reject)
+                                .run();
+                        });
+                        console.log(`Segment converti en MP4 : ${outputFilePath}`);
+    
+                        // Supprimer le segment .ts original
+                        fs.unlinkSync(segmentPath);
+                    });
+                });
+                //console.log(`Segment téléchargé : ${segmentName}`);
+                //downloadedSegments.add(segmentName);
+            }
+        }
+
+        // Attendre avant de vérifier à nouveau les nouveaux segments
+        await setTimeout(2000); // Attendre 5 secondes avant de vérifier à nouveau
+    } catch (error) {
+        console.error('Une erreur s\'est produite lors du téléchargement des segments :', error);
+    }
+}
+
+async function downloadSegments(hlsUrl, website) {
+    try {
+        const response = await axios.get(hlsUrl);
+        const mainPlaylist = response.data;
+        console.log(`main playlist : ${mainPlaylist}`);
+        const subPlaylistUrls = mainPlaylist.split('\n').filter(line => line.includes('.m3u8'));
+
+        if (subPlaylistUrls.length === 0) {
+            console.error('Aucune sous-playlist trouvée dans la playlist principale.');
+            return;
+        }
+
+        // Utilisez la première sous-playlist disponible
+        //const subPlaylistUrl = new URL(subPlaylistUrls[0], hlsUrl).href;
+        const subPlaylistUrl = (website === Website.chaturbate) ? new URL(subPlaylistUrls[subPlaylistUrls.length - 1], hlsUrl).href : new URL(subPlaylistUrls[0], hlsUrl).href;
+
+        //console.log(`Téléchargement des segments à partir de la sous-playlist : ${subPlaylistUrl}`);
+
+        while (true) {
+            await downloadSubPlaylist(subPlaylistUrl);
+        }
+    } catch (error) {
+        console.error('Une erreur s\'est produite lors du téléchargement des segments :', error);
+    }
+}
 export function striptchatUrl(name, data)
 {
     // Pour extraire la sous-chaîne entre \"streamName\":\" et \"
@@ -338,6 +501,10 @@ export async function updateLinksStatus()
 export async function updateLinkStatus(row)
 {
     const data = await findPageInfo(row.Url);
+    if(!data)
+    {
+        return [row.Name, OnlineStatus.offline]; 
+    }
     try{
         switch (row.Website)
         {
@@ -355,14 +522,14 @@ export async function updateLinkStatus(row)
                 });
                 const streamNameMatch = correctedResponse.match(/"room_status": "(.*?)"/);
                 const streamName = streamNameMatch ? streamNameMatch[1] : null;
-                let recordingStatus = RecordingStatus.offline;
-                if (streamName === RecordingStatus.public) {
-                    recordingStatus = RecordingStatus.public;
-                } else if (streamName === RecordingStatus.offline || streamName === RecordingStatus.private) {
-                    recordingStatus = streamName;
+                let onlineStatus = OnlineStatus.offline;
+                if (streamName === OnlineStatus.public) {
+                    onlineStatus = OnlineStatus.public;
+                } else if (streamName === OnlineStatus.offline || streamName === OnlineStatus.private) {
+                    onlineStatus = streamName;
                 }
-                updateColumn(row.Name, 'Online', recordingStatus === RecordingStatus.public);
-                return [row.Name, recordingStatus];
+                updateColumn(row.Name, 'Online', onlineStatus === OnlineStatus.public);
+                return [row.Name, onlineStatus];
             }
             case Website.stripchat:
             {
@@ -383,22 +550,22 @@ export async function updateLinkStatus(row)
                 if(streamOnlineMatch[1] === "true")
                 {
                     updateColumn(row.Name, 'Online', true);
-                    return [row.Name, RecordingStatus.public];
+                    return [row.Name, OnlineStatus.public];
                 }
                 else
                 {
                     updateColumn(row.Name, 'Online', false);
-                    return [row.Name, RecordingStatus.offline];
+                    return [row.Name, OnlineStatus.offline];
                 }               
             }
             case Website.cam4:
             {
-                return [row.Name, RecordingStatus.offline];
+                return [row.Name, OnlineStatus.offline];
             }
             default:
             {
                 console.error("Website given does not supported : ", row.Website)
-                return [row.Name, RecordingStatus.offline];
+                return [row.Name, OnlineStatus.offline];
             }
         }
     }
@@ -406,8 +573,8 @@ export async function updateLinkStatus(row)
     {
         console.error(error.message);
         console.error(`Error might come from the row value : \n${row.Name}`);
-        //console.error(`Error might come from the data value : \n${data}`);
-        return [row.Name, RecordingStatus.offline];
+        console.error(`Error might come from the data value : \n${data}`);
+        return [row.Name, OnlineStatus.offline];
     }
 }
 
@@ -437,13 +604,13 @@ export async function startRecording(modelName)
     const modelRow = await getInfosFromTableWithNameConstraint('links', ['*'], modelName);
     try {
         const [name, status] = await updateLinkStatus(modelRow[0]);
-        if(status == RecordingStatus.public)
+        if(status == OnlineStatus.public)
         {
             createRecording(modelRow[0].Url, modelRow[0].Name, modelRow[0].Website);
         }            
         return status;
     } catch (error) {
         console.error(error.message);
-        return RecordingStatus.offline;
+        return OnlineStatus.offline;
     }
 }

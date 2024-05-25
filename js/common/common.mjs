@@ -1,4 +1,15 @@
-// file to share value between several files
+/*import { EventEmitter } from 'events';
+
+class EventService extends EventEmitter {
+    constructor() {
+        super();
+    }
+}
+
+export const eventService = new EventService();*/
+
+
+// file to share values between several files
 export const Action = {
     delete: 0,
     add: 1
@@ -10,8 +21,9 @@ export const Website = {
     cam4: "cam4"
 }
 
-export const RecordingStatus = {
+export const OnlineStatus = {
     public: "public",
     private: "private",
     offline: "offline"
 }
+

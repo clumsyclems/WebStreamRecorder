@@ -1,4 +1,4 @@
-import {RecordingStatus} from '../common/common.mjs';
+import {OnlineStatus} from '../common/common.mjs';
 
 //test info exchange between main and renderer process
 const func = async () => {
@@ -64,7 +64,7 @@ function insertNewRow(row) {
     newInput.addEventListener('change', (e) => {
         const row = e.target.closest('tr');
         const name = row.getElementsByClassName('name')[0].innerHTML;
-        window.versions.changeRecordingStatus(name, e.target.checked)
+        window.versions.changeOnlineStatus(name, e.target.checked)
             .then((resolve) => {
                 if (e.target.checked) {
                     row.classList.add('recording');
@@ -117,15 +117,15 @@ window.versions.updateModelStatus((model, status) => {
     let statusUnchange = document.getElementById(`${model}`).classList.contains(`${status}`);
     if(!statusUnchange)
     {
-        for(const recordingStatus in RecordingStatus)
+        for(const onlineStatus in OnlineStatus)
         {
-            if(RecordingStatus[recordingStatus] == status)
+            if(OnlineStatus[onlineStatus] == status)
             {
-                document.getElementById(`${model}`).classList.add(`${RecordingStatus[recordingStatus]}`);
+                document.getElementById(`${model}`).classList.add(`${OnlineStatus[onlineStatus]}`);
             }
             else
             {
-                document.getElementById(`${model}`).classList.remove(`${RecordingStatus[recordingStatus]}`);
+                document.getElementById(`${model}`).classList.remove(`${OnlineStatus[onlineStatus]}`);
             }
         }
     }

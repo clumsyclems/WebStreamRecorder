@@ -3,6 +3,7 @@ import sqlite3 from 'sqlite3';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';
+/*import { eventService } from '../common/common.mjs';*/
 
 let db; // La connexion à la base de données sera stockée ici
 
@@ -57,10 +58,19 @@ export async function insertOrUpdateInLinksTable(name, url, website, online = fa
   `;
 
   try {
-    const success = await runQuery(query, [name, url, online, record, website]);
-    return success;
+      console.log("add new element ", name, url);
+      await runQuery(query, [name, url, online, record, website]);
+      return true; // Renvoyer true si l'insertion est réussie
   } catch (error) {
-    return false;
+      if (error.code === 'SQLITE_CONSTRAINT') {
+          // La contrainte d'unicité a été violée, l'élément existe déjà
+          console.error('L\'élément existe déjà dans la table.');
+          return false; // Renvoyer false si l'élément existe déjà
+      } else {
+          // Une autre erreur s'est produite, afficher l'erreur dans la console
+          console.error('Erreur lors de l\'insertion:', error);
+          return false; // Renvoyer false en cas d'erreur
+      }
   }
 }
 
